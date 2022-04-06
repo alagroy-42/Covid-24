@@ -12,7 +12,6 @@ section .data
 
 section .text
     global _start
-    extern printf
 
 _start:
     xor     rdi, rdi
@@ -28,18 +27,16 @@ _start:
     mov     [instr_list], rax
 
     lea     rdi, [rel say_hello]
-    mov     rsi, [code_len]
+    mov     esi, [rel code_len]
     call    _disass
     jmp     _end
 
 ; translates assembly opcode to pseudo assembly opcode
 ; rdi: opcode in dil
-; rsi: current list elem
 ; 
-; returns: total size of instruction
+; returns: encoding of instruction
 _get_instr_encoding:
-    mov     al, BYTE [instruction_set0x00 + edi * 2 + ise_encoding]
-    leave
+    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_encoding]
     ret
 
 ; translates assembly opcode to pseudo assembly opcode
@@ -47,10 +44,16 @@ _get_instr_encoding:
 ; 
 ; returns: pseudo assembly opcode value 
 _get_instr:
-    mov     al, BYTE [instruction_set0x00 + edi * 2 + ise_opcode]
-    leave
+    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_opcode]
     ret
 
+; gets the operand size for a given opcode
+; rdi: opcode in dil
+; 
+; returns: the size of the operands
+_get_instr_size:
+    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_size]
+    ret
 
 ; reads the register held in the ModRM byte
 ; dil: ModRM byte pointer
@@ -139,6 +142,7 @@ _read_SIB_byte_store_sindex:
 _read_SIB_byte_store_disp_8:
     movzx   eax, BYTE [rdi + 1]
     mov     [rsi + mem_disp], eax
+    ret
 
 ; stores the displacement and its scale in mem_disp
 ; This is a read_SIB_byte subfunction so the calling convention is a bit weird.
@@ -150,6 +154,7 @@ _read_SIB_byte_store_disp_8:
 _read_SIB_byte_store_disp_32:
     mov     eax, DWORD [rdi + 1]
     mov     [rsi + mem_disp], eax
+    ret
 
 ; reads the byte and place the content in a Memory_operand struct
 ; rdi: rip
@@ -220,6 +225,58 @@ read_SIB_byte_ret:
 ;
 ; returns : whole instruction size
 _disass_MR:
+    push    rsi
+    mov     rsi, rdx
+    call    _read_ModRM_reg
+    pop     rsi
+    mov     BYTE [rsi + idmr_reg], al
+    push    rsi
+    mov     rsi, rdx
+    call    _read_ModRM_rm
+    pop     rsi
+    mov     BYTE [rsi + idmr_mem + mem_base], al
+    movzx   rax, al
+    mov     rbx, rax
+    call    _read_ModRM_mod
+    mov     al, BYTE [rel ModRM_tab + rax * MODRM_ENTSIZE + rbx]
+    push    rax
+    cmp     rax, MODRM_REL_32
+    jne     disass_MR_handle_SIB
+    mov     BYTE [rsi + idmr_mem + mem_base], RIP
+    mov     BYTE [rsi + idmr_mem + mem_sindex], 0
+    mov     edx, DWORD [rdi + 1]
+    mov     DWORD [rsi + idmr_mem + mem_disp], edx
+    mov     rbx, 5
+    jmp     disass_MR_return_bytes_nb
+disass_MR_handle_SIB:
+    mov     dl, al
+    and     dl, 11110000b
+    cmp     dl, SIB
+    jne     disass_MR_handle_RM
+    inc     rdi
+    add     rsi, 2
+    mov     dl, al
+    mov     rcx, QWORD [rsp]
+    call    _read_SIB_byte
+    mov     bl, al
+    sub     rsi, 2
+    jmp     disass_MR_return_bytes_nb
+disass_MR_handle_RM:
+    xor     dl, dl
+    mov     BYTE [rsi + idmr_mem + mem_sindex], dl
+    and     al, 1111b
+    cmp     al, DISP8
+    jne     disass_MR_handle_RM_handle_disp_32
+    movzx   edx, BYTE [rdi + 1]
+    jmp     disass_MR_handle_RM_store_disp
+disass_MR_handle_RM_handle_disp_32:
+    mov     edx, DWORD [rdi + 1]
+    mov     bl, 5
+disass_MR_handle_RM_store_disp:
+    mov     DWORD [rsi + idmr_mem + mem_disp], edx
+    mov     bl, 2
+disass_MR_return_bytes_nb:
+    mov     rax, rbx ; operands
     ret
 
 ; disassemble operands of instruction using when op1 = modRM/reg and op2 = modRM/mem
@@ -280,11 +337,7 @@ disass_RM_handle_RM_store_disp:
     mov     DWORD [rsi + idrm_mem + mem_disp], edx
     mov     bl, 2
 disass_RM_return_bytes_nb:
-    mov     rax, [rsp]
-    shr     rax, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
-    add     rax, 1 ; opcode
-    add     rax, rbx ; operands
-    ; STORE ENCODING
+    mov     rax, rbx ; operands
     ret
 
 ; disassemble operands of instruction using when op1 = opcode and op2 = imm
@@ -300,9 +353,38 @@ _disass_MI:
 ; rdi: rip
 ; rsi: curr list elem
 ; rdx: rex
+; cl: size
 ;
 ; returns : whole instruction size
 _disass_OI:
+    mov     al, BYTE [rdi]
+    and     al, 111b
+    mov     bl, dl
+    and     bl, 1000b
+    or      al, bl
+    mov     BYTE [rsi + idri_reg], al
+    test    cl, cl
+    jnz     disass_OI_read_imm_32
+    movzx   rax, BYTE [rdi + 1]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     al, 1
+    jmp     disass_OI_end
+disass_OI_read_imm_32:
+    mov     al, dl
+    and     al, REXW
+    test    al, al
+    jnz     disass_OI_read_imm_64
+    mov     eax, DWORD [rdi + 1]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     al, 4
+    jmp     disass_OI_end
+disass_OI_read_imm_64:
+    and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
+    mov     rax, QWORD [rdi + 1]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     al, 8
+    jmp     disass_OI_end
+disass_OI_end:
     ret
 
 ; disassemble the next instruction
@@ -316,17 +398,19 @@ _disass_next_instr:
     mov     [rsi + id_rip], rsi
     push    QWORD 0
     movzx   rax, BYTE [rdi]
-    cmp     ah, 0x4
-    jne     continue_disass_next_instr
+    test    al, REX
+    jz      continue_disass_next_instr
     mov     [rsp], rax
     inc     rdi
     movzx   rax, BYTE [rdi]
 continue_disass_next_instr:
     mov     rdi, rax
     call    _get_instr
-    mov     [rsi + id_opcode], al
-continue_disass_next_instr_2:
+    mov     BYTE [rsi + id_opcode], al
+    call    _get_instr_size
+    and     BYTE [rsi + id_opcode], al
     call    _get_instr_encoding
+    or      BYTE [rsi + id_lm_encode], al
     test    al, al
     jnz     test_MR
     inc     al
@@ -344,12 +428,21 @@ test_RM:
 test_MI:
     cmp     al, MI
     jne     test_OI
+    call    _get_instr_size
+    mov     cl, al
     call    _disass_MI
 test_OI:
     cmp     al, OI
     jne     end_disass_next_instr
+    dec     rdi
+    call    _get_instr_size
+    mov     cl, al
     call    _disass_OI
 end_disass_next_instr:
+    mov     rbx, [rsp]
+    shr     rbx, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
+    inc     rax ; opcode
+    add     rax, rbx ; REX
     leave
     ret
 
@@ -370,23 +463,16 @@ disass_loop:
     pop     rcx
     sub     rcx, rax
     test    rcx, rcx
-    jnz     disass_loop
-    leave
+    jle     disass_loop
     ret
-
-; _display_disass:
-;     lea     rax, [rel instr_list]
-; display_disass_loop:
-;     cmp     BYTE [rax + id_opcode], 0
-;     jnz     display_disass_loop
 
 say_hello:
     mov     rdi, 0
     lea     rsi, [rel hello]
     mov     rdx, hello.len
-    mov     eax, SYS_WRITE
-    movzx   eax, BYTE [rdi + 1]
-    syscall
+    mov     eax, 0x12345678
+    mov     rax, 0x123456781234
+    mov     al, SYS_WRITE
     ret
 
 _end:

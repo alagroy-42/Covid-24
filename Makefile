@@ -6,7 +6,7 @@
 #    By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2022/02/09 14:49:38 by alagroy-          #+#    #+#              #
-#    Updated: 2022/03/29 14:05:27 by alagroy-         ###   ########.fr        #
+#    Updated: 2022/04/06 15:13:06 by alagroy-         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -17,7 +17,7 @@ OBJDIR = ./.objs/
 SRCDIR = ./srcs/
 OBJ_FILES = $(SRCS:.s=.o)
 OBJS = $(addprefix $(OBJDIR), $(OBJ_FILES))
-INCLUDES = ./srcs/defines.s ./srcs/instruction_set.s
+INCLUDES = ./srcs/defines.s ./srcs/instruction_set.s ./srcs/disassembler.s
 
 all : $(OBJDIR) $(NAME)
 

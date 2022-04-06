@@ -3,46 +3,48 @@
 
 struc       Instruction_disass_RM
     idrm_opcode:    resb    1 ; OPCODE + size
+    idrm_lm_encode: resb    1
     idrm_reg:       resb    1 ; encoding | value of left register 
     idrm_mem:       resb    6 ; value of right memory value as reg1, scale|reg2, disp
-    idrm_pad:       resd    1 ; padding to align the structure
+    idrm_pad:       resb    7 ; padding to align the structure
     idrm_rip:       resq    1 ; value of rip on this instruction
 endstruc
 
 struc       Instruction_disass_MR
     idmr_opcode:    resb    1 ; OPCODE + size
+    idmr_lm_encode: resb    1
     idmr_mem:       resb    6 ; encoding | value of left memory value as reg1, scale|reg2, disp
     idmr_reg:       resb    1 ; value of right register 
-    idmr_pad:       resd    1 ; padding to align the structure
+    idmr_pad:       resb    7 ; padding to align the structure
     idmr_rip:       resq    1 ; value of rip on this instruction
 endstruc
 
-struc       Instruction_disass_OI
-    idoi_opcode:    resb    1 ; OPCODE + size
-    idoi_reg:       resb    1 ; encoding | value of right register 
-    idoi_imm:       resd    1 ; value of immediate
-    idoi_pad:       resw    3 ; padding to align the structure
-    idoi_rip:       resq    1 ; value of rip on this instruction
+struc       Instruction_disass_RI
+    idri_opcode:    resb    1 ; OPCODE + size
+    idri_lm_encode: resb    1
+    idri_reg:       resb    1 ; encoding | value of right register 
+    idri_pad:       resw    5 ; padding to align the structure
+    idri_imm:       resq    1 ; value of immediate
+    idri_rip:       resq    1 ; value of rip on this instruction
 endstruc
 
 struc       Instruction_disass_MI
     idmi_opcode:    resb    1
+    idmi_lm_encode: resb    1
     idmi_mem:       resb    6
-    idmi_pad:       resb    1
-    idmi_imm:       resd    1
+    idmi_imm:       resq    1
     idmi_rip:       resq    1
 endstruc
 
-;;;;;            LABEL MARK ????
 struc       Instruction_disass  ; Generic structure before encoding identification
     id_opcode:      resb    1  ; OPCODE | OP_SIZE
                                ; OP_SIZE working as SIB's scale 
-    id_encode:      resb    1 ; encoding 
-                              ; whether it's a register or a memory value, since memory values start with a register,
-                              ; this field is gonna hold a register value.
-                              ; Register values use only 5 bytes (4 bytes to encode the 16 normal registers + the fifth for RIP => 0x10) 
-                              ; The three higher bytes are gonna hold the encoding type value
-    id_pad:         resb    10 ; leet's keep the structure aligned
+    id_lm_encode:   resb    1  ; label mark | encoding
+                               ; whether it's a register or a memory value, since memory values start with a register,
+                               ; this field is gonna hold a register value.
+                               ; Register values use only 5 bytes (4 bytes to encode the 16 normal registers + the fifth for RIP => 0x10) 
+                               ; The three higher bytes are gonna hold the encoding type value
+    id_pad:         resb    14 ; leet's keep the structure aligned
     id_rip:         resq    1  ; value of rip on this instruction
 endstruc
 
@@ -55,7 +57,10 @@ endstruc
 struc       Instruction_set_entry ; Structure used in instruction_set.s
     ise_opcode:     resb    1 ; pseudo-assembly opcode value
     ise_encoding:   resb    1 ; encoding disposition
+    ise_size:       resb    1 ; operand size
 endstruc
+
+%define ISE_SIZE        3
 
 %define REX             0x40
 %define REXW            REX | (1 << 3)
@@ -74,6 +79,11 @@ endstruc
 %define MR              0x2
 %define MI              0x3
 %define OI              0x4
+
+%define ENC_MR          (MR << 6)
+%define ENC_RM          (RM << 6)
+%define ENC_RI          (OI << 6)
+%define ENC_MI          (MI << 6)
 
 %define REG             0x1
 %define SIB             0x2
@@ -104,12 +114,12 @@ endstruc
 %define SIB_BASE_DISP_8     BASE | DISP32
 %define SIB_DISP_32         DISP32
 
-%define SIZE_8          0x1
-%define SIZE_16         0x2
-%define SIZE_32         0x3
-%define SIZE_64         0x4
+%define SIZE_8          0x0
+%define SIZE_16         0x1
+%define SIZE_32         0x2
+%define SIZE_64         0x3
 
 %define MODRM_ENTSIZE   8
-%define RIP             0x10
+%define RIP             10000b
 
 %endif
