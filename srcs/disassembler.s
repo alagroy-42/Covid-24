@@ -19,11 +19,20 @@ struc       Instruction_disass_MR
     idmr_rip:       resq    1 ; value of rip on this instruction
 endstruc
 
+struc       Instruction_disass_RR
+    idrr_opcode:    resb    1 ; OPCODE + size
+    idrr_lm_encode: resb    1
+    idrr_reg1:      resb    1 ; value of right register 
+    idrr_reg2:      resb    1 ; encoding | value of left memory value as reg1, scale|reg2, disp
+    idrr_pad:       resb    12 ; padding to align the structure
+    idrr_rip:       resq    1 ; value of rip on this instruction
+endstruc
+
 struc       Instruction_disass_RI
     idri_opcode:    resb    1 ; OPCODE + size
     idri_lm_encode: resb    1
     idri_reg:       resb    1 ; encoding | value of right register 
-    idri_pad:       resw    5 ; padding to align the structure
+    idri_pad:       resb    5 ; padding to align the structure
     idri_imm:       resq    1 ; value of immediate
     idri_rip:       resq    1 ; value of rip on this instruction
 endstruc
@@ -47,6 +56,8 @@ struc       Instruction_disass  ; Generic structure before encoding identificati
     id_pad:         resb    14 ; leet's keep the structure aligned
     id_rip:         resq    1  ; value of rip on this instruction
 endstruc
+
+%define ID_SIZE 24
 
 struc       Memory_operand
     mem_base:       resb    1 ; base register
@@ -78,28 +89,28 @@ endstruc
 %define RM              0x1
 %define MR              0x2
 %define MI              0x3
-%define OI              0x4
+%define RI              0x4
+%define RR              0x5
 
-%define ENC_MR          (MR << 6)
-%define ENC_RM          (RM << 6)
-%define ENC_RI          (OI << 6)
-%define ENC_MI          (MI << 6)
-
-%define REG             0x1
+%define RM              0x1
 %define SIB             0x2
 %define REL             0x4
+%define REG             0x8
 
 %define DISP0           0x0
 %define DISP8           0x1
 %define DISP32          0x2
 
-%define MODRM_RM        (REG << 4)
-%define MODRM_RM_8      (REG << 4) | DISP8
-%define MODRM_RM_32     (REG << 4) | DISP32
+%define MOD_REG         0x3
+
+%define MODRM_RM        (RM << 4)
+%define MODRM_RM_8      (RM << 4) | DISP8
+%define MODRM_RM_32     (RM << 4) | DISP32
 %define MODRM_SIB       (SIB << 4)
 %define MODRM_SIB_8     (SIB << 4) | DISP8
 %define MODRM_SIB_32    (SIB << 4) | DISP32
 %define MODRM_REL_32    (REL << 4) | DISP32
+%define MODRM_REG       (REG << 4)
 
 %define BASE            (1 << 5)       
 %define SINDEX          (1 << 4)

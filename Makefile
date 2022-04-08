@@ -6,7 +6,7 @@
 #    By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2022/02/09 14:49:38 by alagroy-          #+#    #+#              #
-#    Updated: 2022/04/06 15:13:06 by alagroy-         ###   ########.fr        #
+#    Updated: 2022/04/07 15:24:45 by alagroy-         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -32,17 +32,10 @@ $(OBJDIR)%.o: $(SRCDIR)%.s $(INCLUDES) Makefile
 $(OBJDIR):
 	mkdir -p $@
 
-test: $(OBJDIR) $(NAME) sample
-	mkdir -p /tmp/test
-	mkdir -p /tmp/test2
-	touch /tmp/test/test1
-	touch /tmp/test/test2
-	touch /tmp/test/test3
-	cp sample /tmp/test2/sample
-	cp /bin/ls /tmp/test/ls
-
-sample: sample.c
-	gcc -Wall -Werror -Wextra -o $@ $<
+test: $(OBJDIR)
+	nasm -i $(SRCDIR) -D DEBUG_TIME -f elf64 -o ./.objs/death.o ./srcs/death.s
+	gcc -c ./srcs/test_debug.c -o ./.objs/test_debug.o
+	ld -dynamic-linker /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 -o Death -lc ./.objs/death.o ./.objs/test_debug.o # -e _start_first_time
 
 clean:
 	$(RM) -Rf $(OBJDIR)
