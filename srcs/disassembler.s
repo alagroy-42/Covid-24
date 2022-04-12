@@ -73,11 +73,14 @@ endstruc
 
 %define ISE_SIZE        3
 
+%define RIP             10000b
+%define NOREG           11111b
+
 %define REX             0x40
 %define REXW            REX | (1 << 3)
-%define REXR            REX | (1 << 2)
-%define REXX            REX | (1 << 1)
-%define REXB            REX | (1 << 0)
+%define REXR            (1 << 2)
+%define REXX            (1 << 1)
+%define REXB            (1 << 0)
 
 %define MOV             0xb0
 %define NOP             0x90
@@ -112,8 +115,11 @@ endstruc
 %define MODRM_REL_32    (REL << 4) | DISP32
 %define MODRM_REG       (REG << 4)
 
+%define MODRM_ENTSIZE   8
+
 %define BASE            (1 << 5)       
 %define SINDEX          (1 << 4)
+%define NO_SINDEX       RIP
 
 %define SIB_BASE            BASE
 %define SIB_SI              SINDEX
@@ -129,8 +135,5 @@ endstruc
 %define SIZE_16         0x1
 %define SIZE_32         0x2
 %define SIZE_64         0x3
-
-%define MODRM_ENTSIZE   8
-%define RIP             10000b
 
 %endif
