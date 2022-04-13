@@ -37,12 +37,36 @@ struc       Instruction_disass_RI
     idri_rip:       resq    1 ; value of rip on this instruction
 endstruc
 
+struc       Instruction_disass_O
+    ido_opcode:    resb    1 ; OPCODE + size
+    ido_lm_encode: resb    1
+    ido_reg:       resb    1 ; register value 
+    ido_pad:       resb    13 ; padding to align the structure
+    ido_rip:       resq    1 ; value of rip on this instruction
+endstruc
+
 struc       Instruction_disass_MI
     idmi_opcode:    resb    1
     idmi_lm_encode: resb    1
     idmi_mem:       resb    6
     idmi_imm:       resq    1
     idmi_rip:       resq    1
+endstruc
+
+struc       Instruction_disass_M
+    idm_opcode:    resb    1
+    idm_lm_encode: resb    1
+    idm_mem:       resb    6
+    idm_pad:       resq    1
+    idm_rip:       resq    1
+endstruc
+
+struc       Instruction_disass_I
+    idi_opcode:    resb    1
+    idi_lm_encode: resb    1
+    idi_pad:       resb    6
+    idi_imm:       resq    1
+    idi_rip:       resq    1
 endstruc
 
 struc       Instruction_disass  ; Generic structure before encoding identification
@@ -69,9 +93,10 @@ struc       Instruction_set_entry ; Structure used in instruction_set.s
     ise_opcode:     resb    1 ; pseudo-assembly opcode value
     ise_encoding:   resb    1 ; encoding disposition
     ise_size:       resb    1 ; operand size
+    ise_extended:   resb    1
 endstruc
 
-%define ISE_SIZE        3
+%define ISE_SIZE        4
 
 %define RIP             10000b
 %define NOREG           11111b
@@ -87,6 +112,8 @@ endstruc
 %define SYSCALL         0xf0
 %define RET             0xc0
 %define LEA             0x80
+%define PUSH            0x50
+%define POP             0x58
 
 %define NO              0x0
 %define RM              0x1
@@ -94,6 +121,9 @@ endstruc
 %define MI              0x3
 %define RI              0x4
 %define RR              0x5
+%define O               0x6
+%define I               0x7
+%define M               0x8
 
 %define RM              0x1
 %define SIB             0x2

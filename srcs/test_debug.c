@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/12 14:47:10 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/13 02:18:07 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -79,6 +79,33 @@ typedef struct              s_instruction_disass_mi
     byte    *rip;
 } __attribute__((packed))   t_instr_mi;
 
+typedef struct              s_instruction_disass_m
+{
+    byte    opcode;
+    byte    lm_encode;
+    t_memop memop;
+    long    pad;
+    byte    *rip;
+} __attribute__((packed))   t_instr_m;
+
+typedef struct              s_instruction_disass_i
+{
+    byte    opcode;
+    byte    lm_encode;
+    byte    padding[6];
+    long    imm;
+    byte    *rip;
+} __attribute__((packed))   t_instr_i;
+
+typedef struct              s_instruction_disass_o
+{
+    byte    opcode;
+    byte    lm_encode;
+    byte    reg;
+    byte    padding[13];
+    byte    *rip;
+} __attribute__((packed))   t_instr_o;
+
 static void     get_opcode(char *opcode, byte op_value)
 {
     op_value &= 0b11111100;
@@ -88,6 +115,10 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "LEA");
     else if (op_value == 0xb0)
         strcpy(opcode, "MOV");
+    else if (op_value == 0x50)
+        strcpy(opcode, "PUSH");
+    else if (op_value == 0x58)
+        strcpy(opcode, "POP");
     else
         strcpy(opcode, "NOP");
 }
@@ -240,6 +271,20 @@ static void     display_instr(t_instr *instr)
         get_register(((t_instr_rr *)instr)->reg, size, reg);
         get_register(((t_instr_rr *)instr)->reg2, size, reg2);
         printf("\toperands: %s, %s\n", reg, reg2);
+    }
+    else if (encoding == 6) // O
+    {
+        get_register(((t_instr_o *)instr)->reg, size, reg);
+        printf("\toperands: %s\n", reg);
+    }
+    else if (encoding == 7) // I
+    {
+        printf("\toperands: %0#x\n", ((t_instr_i *)instr)->imm);
+    }
+    else if (encoding == 8) // M
+    {
+        get_mem(((t_instr_m *)instr)->memop, size, mem);
+        printf("\toperands: %s\n", mem);
     }
 }
 

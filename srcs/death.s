@@ -261,47 +261,47 @@ _read_ModRM_byte:
     and     rbx, 111b
     call    _read_ModRM_mod
     cmp     al, MOD_REG
-    je      _read_ModRM_byte_handle_RR
+    je      read_ModRM_byte_handle_RR
     mov     al, BYTE [rel ModRM_tab + rax * MODRM_ENTSIZE + rbx]
     cmp     rax, MODRM_REL_32
-    jne     _read_ModRM_byte_handle_SIB
+    jne     read_ModRM_byte_handle_SIB
     mov     BYTE [rsi + mem_base], RIP
-    mov     BYTE [rsi + mem_sindex], 0
+    mov     BYTE [rsi + mem_sindex], NOREG
     mov     edx, DWORD [rdi + 1]
     mov     DWORD [rsi + mem_disp], edx
     mov     rbx, 5
-    jmp     _read_ModRM_byte_return_bytes_nb
-_read_ModRM_byte_handle_SIB:
+    jmp     read_ModRM_byte_return_bytes_nb
+read_ModRM_byte_handle_SIB:
     mov     dl, al
     and     dl, 11110000b
     cmp     dl, MODRM_SIB
-    jne     _read_ModRM_byte_handle_RM
+    jne     read_ModRM_byte_handle_RM
     mov     dl, BYTE [rdi]
     inc     rdi
     mov     rcx, QWORD [rsp]
     call    _read_SIB_byte
     inc     al ; _read_SIB_byte doesn't count the Mod/RM byte
     mov     bl, al
-    jmp     _read_ModRM_byte_return_bytes_nb
-_read_ModRM_byte_handle_RM:
+    jmp     read_ModRM_byte_return_bytes_nb
+read_ModRM_byte_handle_RM:
     mov     bl, 1
     and     al, 1111b
     test    al, al
-    jz      disass_MR_return_bytes_nb
+    jz      read_ModRM_byte_return_bytes_nb
     cmp     al, DISP8
-    jne     _read_ModRM_byte_handle_RM_handle_disp_32
+    jne     read_ModRM_byte_handle_RM_handle_disp_32
     movzx   edx, BYTE [rdi + 1]
     inc     bl
-    jmp     _read_ModRM_byte_handle_RM_store_disp
-_read_ModRM_byte_handle_RM_handle_disp_32:
+    jmp     read_ModRM_byte_handle_RM_store_disp
+read_ModRM_byte_handle_RM_handle_disp_32:
     mov     edx, DWORD [rdi + 1]
     add     bl, 4
-_read_ModRM_byte_handle_RM_store_disp:
+read_ModRM_byte_handle_RM_store_disp:
     mov     DWORD [rsi + mem_disp], edx
-    jmp     _read_ModRM_byte_return_bytes_nb
-_read_ModRM_byte_handle_RR:
+    jmp     read_ModRM_byte_return_bytes_nb
+read_ModRM_byte_handle_RR:
     mov     bl, 0
-_read_ModRM_byte_return_bytes_nb:
+read_ModRM_byte_return_bytes_nb:
     mov     rax, rbx ; operands
     leave
     ret
@@ -453,6 +453,71 @@ disass_OI_read_imm_64:
 disass_OI_end:
     ret
 
+; disassemble the O encoded operand
+; rdi: rip
+; rsi: current list elem
+; rdx: REX byte
+;
+; returns: whole instruction size (1)
+_disass_O:
+    push    rbp
+    mov     rbp, rsp
+    mov     al, [rdi]
+    and     al, 111b
+    mov     bl, dl
+    and     bl, 1b
+    shl     bl, 3
+    or      al, bl
+    mov     BYTE [rsi + ido_reg], al
+    xor     al, al
+    leave
+    ret
+
+; disassemble the I encoded operand
+; rdi: rip
+; rsi: current list elem
+; rdx: imm size
+;
+; returns: whole instruction size
+_disass_I:
+    push    rbp
+    mov     rbp, rsp
+    xor     rbx, rbx
+    test    dl, dl
+    jnz     _disass_I_imm_32
+    mov     bl, BYTE [rdi]
+    mov     al, 1
+    jmp     _disass_I_store_imm
+_disass_I_imm_32:
+    cmp     dl, SIZE_32
+    jne     _disass_I_imm_64
+    mov     ebx, DWORD [rdi]
+    mov     al, 4
+    jmp     _disass_I_store_imm
+_disass_I_imm_64:
+    mov     rbx, QWORD [rdi]
+    mov     al, 8
+_disass_I_store_imm:
+    mov     [rsi + idi_imm], rbx
+    leave
+    ret
+
+; disassemble M encoded instruction
+; rdi: current rip
+; rsi: current list element
+; rdx: REX byte
+_disass_M:
+    push    rbp
+    mov     rbp, rsp
+    mov     rcx, rdx
+    mov     rdx, rsi
+    add     rsi, idm_mem
+    add     rdx, idm_rip ; there is no reg in M encoded instruction so this field is useless and will be overwritten by rip later
+    call    _read_ModRM_byte
+    sub     rsi, idm_mem
+    leave
+    ret
+
 ; disassemble the next instruction
 ; rdi: current rip
 ; rsi: current list elem
@@ -461,7 +526,6 @@ disass_OI_end:
 _disass_next_instr:
     push    rbp
     mov     rbp, rsp
-    mov     [rsi + id_rip], rdi
     push    QWORD 0
     movzx   rax, BYTE [rdi]
     mov     bl, al
@@ -512,11 +576,30 @@ test_MI:
     jmp     end_disass_next_instr
 test_OI:
     cmp     al, RI
-    jne     end_disass_next_instr
+    jne     test_O
     dec     rdi
     mov     cl, BYTE [rsi + id_opcode]
     and     cl, 11b
     call    _disass_OI
+    jmp     end_disass_next_instr
+test_O:
+    cmp     al, O
+    jne     test_I
+    dec     rdi
+    call    _disass_O
+    jmp     end_disass_next_instr
+test_I:
+    cmp     al, I
+    jne     test_M
+    mov     dl, BYTE [rsi + id_opcode]
+    and     dl, 11b
+    call    _disass_I
+    jmp     end_disass_next_instr
+test_M:
+    cmp     al, M
+    jne     end_disass_next_instr
+    call    _disass_M
+    jmp     end_disass_next_instr
 end_disass_next_instr:
     mov     rbx, [rsp]
     shr     rbx, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
@@ -540,6 +623,7 @@ disass_loop:
     call    _disass_next_instr
     pop     rdi
     add     rdi, rax
+    mov     [rsi + id_rip], rdi
     add     rsi, ID_SIZE
     pop     rcx
     sub     rcx, rax
@@ -548,14 +632,12 @@ disass_loop:
     ret
 
 
-;;;; TEST modifs MI
 say_hello:
-    mov     BYTE [rbx + rbx], 0x12
-    mov     DWORD [rsp + rax], 0x1234
-    mov     BYTE [rsp + r8 * 4 + 0x10], 0x12
-    mov     DWORD [rcx + 0x10], 0x1234
-    mov     BYTE [r15 + 0x10], 0x12
-    mov     DWORD [r13], 0x1234
+    push    QWORD [rel hello]
+    push    QWORD [hello]
+    push    QWORD [rsi]
+    push    QWORD [rdi + rbx * 8 + 0x1234]
+    push    QWORD [rsp + 0x1234]
     ret
 
 _end:
