@@ -9,6 +9,8 @@ section .data
         .len: equ $ - hello
     code_len: dd _end - say_hello
     instr_list: dq 0
+    label_table: dq 0
+    future_label_table: dq 0
     opcode_extension: db 0
 
 section .text
@@ -26,7 +28,31 @@ _start:
     syscall
     test    al, al
     jnz     _end
-    mov     [instr_list], rax
+    mov     [rel instr_list], rax
+
+    xor     rdi, rdi
+    mov     rsi, 4096
+    mov     rdx, PROT_READ | PROT_WRITE
+    mov     r10, MAP_ANONYMOUS | MAP_PRIVATE
+    mov     r8, -1
+    xor     r9, r9
+    mov     rax, SYS_MMAP
+    syscall
+    test    al, al
+    jnz     _end
+    mov     [rel label_table], rax
+
+    xor     rdi, rdi
+    mov     rsi, 4096
+    mov     rdx, PROT_READ | PROT_WRITE
+    mov     r10, MAP_ANONYMOUS | MAP_PRIVATE
+    mov     r8, -1
+    xor     r9, r9
+    mov     rax, SYS_MMAP
+    syscall
+    test    al, al
+    jnz     _end
+    mov     [rel future_label_table], rax
 
     lea     rdi, [rel say_hello]
     mov     esi, [rel code_len]
@@ -557,6 +583,7 @@ disass_instr_extend_opcode_end:
 _disass_next_instr:
     push    rbp
     mov     rbp, rsp
+    mov     [rsi + id_rip], rdi
     push    QWORD 0
     movzx   rax, BYTE [rdi]
     mov     bl, al
@@ -660,7 +687,6 @@ disass_loop:
     call    _disass_next_instr
     pop     rdi
     add     rdi, rax
-    mov     [rsi + id_rip], rdi
     add     rsi, ID_SIZE
     pop     rcx
     sub     rcx, rax
