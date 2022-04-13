@@ -9,6 +9,7 @@ section .data
         .len: equ $ - hello
     code_len: dd _end - say_hello
     instr_list: dq 0
+    opcode_extension: db 0
 
 section .text
     global _start
@@ -41,7 +42,7 @@ _start:
 ; 
 ; returns: encoding of instruction
 _get_instr_encoding:
-    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_encoding]
+    mov     al, BYTE [rel instruction_set0x00 + edi * ISE_SIZE + ise_encoding]
     ret
 
 ; translates assembly opcode to pseudo assembly opcode
@@ -49,7 +50,7 @@ _get_instr_encoding:
 ; 
 ; returns: pseudo assembly opcode value 
 _get_instr:
-    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_opcode]
+    mov     al, BYTE [rel instruction_set0x00 + edi * ISE_SIZE + ise_opcode]
     ret
 
 ; gets the operand size for a given opcode
@@ -57,7 +58,15 @@ _get_instr:
 ; 
 ; returns: the size of the operands
 _get_instr_size:
-    mov     al, BYTE [instruction_set0x00 + edi * ISE_SIZE + ise_size]
+    mov     al, BYTE [rel instruction_set0x00 + edi * ISE_SIZE + ise_size]
+    ret
+
+; gets a bool that indicates if the opcode is extended in ModRM's reg
+; rdi: opcode in dil
+;
+; returns: 1 if opcode is extended, 0 otherwise
+_is_instr_reg_extended:
+    mov     al, BYTE [rel instruction_set0x00 + edi * ISE_SIZE + ise_extended]
     ret
 
 ; reads the register held in the ModRM byte
@@ -385,7 +394,7 @@ _disass_MI:
     mov     rcx, rdx
     mov     rdx, rsi
     add     rsi, idmi_mem
-    add     rdx, idmi_imm ; useless but it will be overwritten later
+    lea     rdx, [rel opcode_extension]
     call    _read_ModRM_byte
     mov     rbx, rax
     pop     rsi
@@ -512,10 +521,32 @@ _disass_M:
     mov     rcx, rdx
     mov     rdx, rsi
     add     rsi, idm_mem
-    add     rdx, idm_rip ; there is no reg in M encoded instruction so this field is useless and will be overwritten by rip later
+    lea     rdx, [rel opcode_extension]
     call    _read_ModRM_byte
     sub     rsi, idm_mem
     leave
+    ret
+
+; extends the opcode with the extension stored in ModRM's reg if needed
+; rsi: current list elem
+; 
+; returns: void
+_disass_instr_extend_opcode:
+    mov     bl, [rsi + id_opcode]
+    and     bl, 0xfc
+    mov     cl, BYTE [rel opcode_extension]
+    cmp     bl, PUSH
+    jne     disass_instr_extend_opcode_next_opcode
+    cmp     cl, 6
+    je      disass_instr_extend_opcode_end
+    cmp     cl, 2
+    jne     disass_instr_extend_opcode_end
+    mov     BYTE [rsi + id_opcode], CALL
+    mov     bl, SIZE_64
+    or      BYTE [rsi + id_opcode], bl
+    jmp     disass_instr_extend_opcode_end
+disass_instr_extend_opcode_next_opcode:
+disass_instr_extend_opcode_end:
     ret
 
 ; disassemble the next instruction
@@ -540,6 +571,8 @@ continue_disass_next_instr:
     mov     rdi, rax
     call    _get_instr
     mov     BYTE [rsi + id_opcode], al
+    call    _is_instr_reg_extended
+    mov     r8, rax
     call    _get_instr_size
     mov     rbx, [rsp + 0x8]
     and     rbx, REXW
@@ -547,7 +580,7 @@ continue_disass_next_instr:
     jne     disass_next_instr_store_size
     mov     al, SIZE_64
 disass_next_instr_store_size:
-    or     BYTE [rsi + id_opcode], al
+    or      BYTE [rsi + id_opcode], al
     call    _get_instr_encoding
     or      BYTE [rsi + id_lm_encode], al
     pop     rdi
@@ -601,6 +634,10 @@ test_M:
     call    _disass_M
     jmp     end_disass_next_instr
 end_disass_next_instr:
+    test    r8, r8
+    jz      instr_not_extended
+    call    _disass_instr_extend_opcode
+instr_not_extended:
     mov     rbx, [rsp]
     shr     rbx, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
     inc     rax ; opcode
@@ -636,6 +673,7 @@ say_hello:
     push    QWORD [rel hello]
     push    QWORD [hello]
     push    QWORD [rsi]
+    call    QWORD [rsi]
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
     ret

@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/13 02:18:07 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/13 16:24:46 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -119,6 +119,8 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "PUSH");
     else if (op_value == 0x58)
         strcpy(opcode, "POP");
+    else if (op_value == 0xe8)
+        strcpy(opcode, "CALL");
     else
         strcpy(opcode, "NOP");
 }

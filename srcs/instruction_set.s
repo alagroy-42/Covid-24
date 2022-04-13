@@ -262,7 +262,7 @@ instruction_set0xfb: db NOP, 0, SIZE_32, 0
 instruction_set0xfc: db NOP, 0, SIZE_32, 0
 instruction_set0xfd: db NOP, 0, SIZE_32, 0
 instruction_set0xfe: db NOP, 0, SIZE_32, 0
-instruction_set0xff: db PUSH, M, SIZE_64, 0
+instruction_set0xff: db PUSH, M, SIZE_64, 1
 
 ;;; Mod/RM Tab
 

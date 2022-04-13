@@ -114,6 +114,7 @@ endstruc
 %define LEA             0x80
 %define PUSH            0x50
 %define POP             0x58
+%define CALL            0xe8
 
 %define NO              0x0
 %define RM              0x1
