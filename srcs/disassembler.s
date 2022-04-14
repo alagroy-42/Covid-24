@@ -98,6 +98,13 @@ endstruc
 
 %define ISE_SIZE        4
 
+struc       Label_entry
+    label_rip:      resq    1 ; the code rip that points on label
+    label_elem:     resq    1 ; a pointer on the instruction pointed on by label
+endstruc
+
+%define LABEL_ENTRY_SIZE    16
+
 %define RIP             10000b
 %define NOREG           11111b
 
@@ -115,6 +122,10 @@ endstruc
 %define PUSH            0x50
 %define POP             0x58
 %define CALL            0xe8
+%define JMP             0xec
+%define JCC             0x70
+
+%define LABEL_MARK      0x10
 
 %define NO              0x0
 %define RM              0x1
@@ -125,6 +136,7 @@ endstruc
 %define O               0x6
 %define I               0x7
 %define M               0x8
+%define D               0x9
 
 %define RM              0x1
 %define SIB             0x2

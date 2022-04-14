@@ -239,10 +239,10 @@ instruction_set0xe4: db NOP, 0, SIZE_32, 0
 instruction_set0xe5: db NOP, 0, SIZE_32, 0
 instruction_set0xe6: db NOP, 0, SIZE_32, 0
 instruction_set0xe7: db NOP, 0, SIZE_32, 0
-instruction_set0xe8: db NOP, 0, SIZE_32, 0
-instruction_set0xe9: db NOP, 0, SIZE_32, 0
+instruction_set0xe8: db CALL, D, SIZE_32, 0
+instruction_set0xe9: db JMP, D, SIZE_32, 0
 instruction_set0xea: db NOP, 0, SIZE_32, 0
-instruction_set0xeb: db NOP, 0, SIZE_32, 0
+instruction_set0xeb: db JMP, D, SIZE_8, 0
 instruction_set0xec: db NOP, 0, SIZE_32, 0
 instruction_set0xed: db NOP, 0, SIZE_32, 0
 instruction_set0xee: db NOP, 0, SIZE_32, 0
@@ -271,3 +271,5 @@ ModRM_tab: db       MODRM_RM,       MODRM_RM,       MODRM_RM,       MODRM_RM,   
 ModRM_tab_01: db    MODRM_RM_8,     MODRM_RM_8,     MODRM_RM_8,     MODRM_RM_8,     MODRM_SIB_8,    MODRM_RM_8,     MODRM_RM_8,     MODRM_RM_8
 ModRM_tab_10: db    MODRM_RM_32,    MODRM_RM_32,    MODRM_RM_32,    MODRM_RM_32,    MODRM_SIB_32,   MODRM_RM_32,    MODRM_RM_32,    MODRM_RM_32
 ModRM_tab_11: db    MODRM_REG,      MODRM_REG,      MODRM_REG,      MODRM_REG,      MODRM_REG,      MODRM_REG,      MODRM_REG,      MODRM_REG
+
+memory_offset_tab: db 0, idrm_mem, idmr_mem, idmi_mem, 0, 0, 0, 0, idm_mem ; 0 if none because 0 is opcode

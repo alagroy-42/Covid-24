@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/13 16:24:46 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/14 17:58:22 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -106,6 +106,13 @@ typedef struct              s_instruction_disass_o
     byte    *rip;
 } __attribute__((packed))   t_instr_o;
 
+typedef struct              s_label_entry
+{
+    byte    *rip;
+    t_instr *instr;
+} __attribute__((packed))   t_label_entry;
+
+
 static void     get_opcode(char *opcode, byte op_value)
 {
     op_value &= 0b11111100;
@@ -121,6 +128,8 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "POP");
     else if (op_value == 0xe8)
         strcpy(opcode, "CALL");
+    else if (op_value == 0xec)
+        strcpy(opcode, "JMP");
     else
         strcpy(opcode, "NOP");
 }
@@ -233,7 +242,7 @@ static void     display_instr(t_instr *instr)
     int         encoding;
     
     size = instr->opcode & 0b11;
-    encoding = instr->lm_encode;
+    encoding = (instr->lm_encode) & 0b1111;
     if (!size)
         size = 8;
     else if (size == 1)
@@ -243,7 +252,7 @@ static void     display_instr(t_instr *instr)
     else
         size = 64;
     get_opcode(opcode, instr->opcode);
-    printf("Instruction at %p: opcode: %s, operand_size: %d\n", instr->rip, opcode, size);
+    printf("Instruction at %p: opcode: %s, operand_size: %d, LM: %d\n", instr->rip, opcode, size, instr->lm_encode >> 4);
     if (encoding == 0)
         return ;
     else if (encoding == 1) // RM
@@ -294,7 +303,7 @@ void        _display_list(t_instr *list)
 {
     t_instr     *instr;
 
-    instr = *(&list);
+    instr = list;
     while (instr->opcode)
     {
         display_instr(instr);
@@ -302,3 +311,13 @@ void        _display_list(t_instr *list)
     }
 }
 
+void        _display_labels(t_label_entry *label_table)
+{
+    printf("\nLabel table:\n");
+    while (label_table->rip)
+    {
+        printf("Label: %p disassembled at : %p\nCorresponding to:\n\t", label_table->rip, label_table->instr);
+        display_instr(label_table->instr);
+        label_table++;
+    }
+}

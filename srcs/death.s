@@ -12,10 +12,12 @@ section .data
     label_table: dq 0
     future_label_table: dq 0
     opcode_extension: db 0
+    label_instr: db CALL, JMP, JCC, 0
 
 section .text
     global _start
     extern _display_list
+    extern _display_labels
 
 _start:
     xor     rdi, rdi
@@ -60,6 +62,8 @@ _start:
 %ifdef      DEBUG_TIME
     mov     rdi, [instr_list]
     call    _display_list
+    mov     rdi, [label_table]
+    call    _display_labels
 %endif
     jmp     _end
 
@@ -346,7 +350,7 @@ read_ModRM_byte_return_bytes_nb:
 ; rsi: curr list elem
 ; rdx: rex
 ;
-; returns : whole instruction size
+; returns : operands size
 _disass_MR:
     push    rbp
     mov     rbp, rsp
@@ -379,7 +383,7 @@ disass_MR_return_bytes_nb:
 ; rsi: curr list elem
 ; rdx: rex
 ;
-; returns : whole instruction size
+; returns : operands size
 _disass_RM:
     push    rbp
     mov     rbp, rsp
@@ -410,7 +414,7 @@ disass_RM_return_bytes_nb:
 ; rdx: rex
 ; cl: size
 ;
-; returns : whole instruction size
+; returns : operands size
 _disass_MI:
     push    rbp
     mov     rbp, rsp
@@ -457,7 +461,7 @@ disass_MI_end:
 ; rdx: rex
 ; cl: size
 ;
-; returns : whole instruction size
+; returns : operands size
 _disass_OI:
     mov     al, BYTE [rdi]
     and     al, 111b
@@ -493,7 +497,7 @@ disass_OI_end:
 ; rsi: current list elem
 ; rdx: REX byte
 ;
-; returns: whole instruction size (1)
+; returns: operands size (1)
 _disass_O:
     push    rbp
     mov     rbp, rsp
@@ -513,7 +517,7 @@ _disass_O:
 ; rsi: current list elem
 ; rdx: imm size
 ;
-; returns: whole instruction size
+; returns: operands size
 _disass_I:
     push    rbp
     mov     rbp, rsp
@@ -541,6 +545,8 @@ _disass_I_store_imm:
 ; rdi: current rip
 ; rsi: current list element
 ; rdx: REX byte
+;
+; returns: operands size
 _disass_M:
     push    rbp
     mov     rbp, rsp
@@ -551,6 +557,29 @@ _disass_M:
     call    _read_ModRM_byte
     sub     rsi, idm_mem
     leave
+    ret
+
+; disassemble a D encoded instruction
+; rdi: rip
+; rsi: current list element
+; rdx: size
+;
+; returns: operands size
+_disass_D:
+    mov     BYTE [rsi + id_lm_encode], M
+    mov     BYTE [rsi + idm_mem + mem_base], RIP
+    mov     BYTE [rsi + idm_mem + mem_sindex], NOREG
+    xor     rbx, rbx
+    test    dl, dl
+    jnz     disass_D_store_offset_32
+    mov     al, 1
+    mov     bl, BYTE [rdi]
+    jmp     disass_D_store_offset
+disass_D_store_offset_32:
+    mov     al, 4
+    mov     ebx, DWORD [rdi]
+disass_D_store_offset:
+    mov     DWORD [rsi + idm_mem + mem_disp], ebx
     ret
 
 ; extends the opcode with the extension stored in ModRM's reg if needed
@@ -566,11 +595,19 @@ _disass_instr_extend_opcode:
     cmp     cl, 6
     je      disass_instr_extend_opcode_end
     cmp     cl, 2
-    jne     disass_instr_extend_opcode_end
+    jne     disass_instr_extend_opcode_test_push_4
     mov     BYTE [rsi + id_opcode], CALL
     mov     bl, SIZE_64
     or      BYTE [rsi + id_opcode], bl
     jmp     disass_instr_extend_opcode_end
+disass_instr_extend_opcode_test_push_4:
+    cmp     cl, 4
+    jne     disass_instr_extend_opcode_end
+    mov     BYTE [rsi + id_opcode], JMP
+    mov     bl, SIZE_64
+    or      BYTE [rsi + id_opcode], bl
+    jmp     disass_instr_extend_opcode_end
+    
 disass_instr_extend_opcode_next_opcode:
 disass_instr_extend_opcode_end:
     ret
@@ -657,8 +694,15 @@ test_I:
     jmp     end_disass_next_instr
 test_M:
     cmp     al, M
-    jne     end_disass_next_instr
+    jne     test_D
     call    _disass_M
+    jmp     end_disass_next_instr
+test_D:
+    cmp     al, D
+    jne     end_disass_next_instr
+    mov     dl, BYTE [rsi + id_opcode]
+    and     dl, 11b
+    call    _disass_D
     jmp     end_disass_next_instr
 end_disass_next_instr:
     test    r8, r8
@@ -672,6 +716,127 @@ instr_not_extended:
     movzx   rax, al
     leave
     ret
+
+; returns a bool indicating if instr needs label handling
+; rsi: disassembled instr
+;
+; returns: 0 if no, 1 if yes
+_instr_with_label:
+    lea     rbx, [rel label_instr]
+instr_with_label_loop:
+    mov     al, BYTE [rbx]
+    mov     dl, BYTE [rsi + id_opcode]
+    and     dl, 11111100b
+    cmp     dl, al
+    je      instr_with_label_ret
+    test    al, al
+    jz      instr_with_label_ret
+    inc     rbx
+    jmp     instr_with_label_loop
+instr_with_label_ret:
+    ret
+
+; gets the offset of the memory operand structure
+; rsi: disassembled instruction
+;
+; returns: the offset
+_get_disassembled_instr_memory_offset:
+    xor     rbx, rbx
+    mov     bl, [rsi + id_lm_encode]
+    and     bl, 1111b
+    mov     al, [rel memory_offset_tab + rbx]
+    ret
+
+; returns a bool indicating if the label has already been disassembled
+; rdi: label's rip
+;
+; returns: 1 if label is already disassembled, 0 otherwise
+_is_known_label:
+    mov     rdx, [rel label_table]
+    xor     al, al
+is_known_label_loop:
+    mov     rbx, [rdx + label_rip]
+    test    rbx, rbx
+    jz      is_known_label_not_found
+    cmp     rbx, rdi
+    je      is_known_label_found
+    add     rdx, LABEL_ENTRY_SIZE
+    jmp     is_known_label_loop
+is_known_label_found:
+    inc     al
+is_known_label_not_found:
+    ret
+
+; checks if label is not known but points on an already disassembled instruction
+; rdi: label's rip
+;
+; returns: instruction list element pointer, NULL otherwise
+_is_disassembled_label:
+    mov     rax, [rel instr_list]
+is_disassembled_label_loop:
+    mov     rdx, [rax + id_rip]
+    cmp     rdx, rdi
+    je      is_disassembled_label_ret
+    test    rdx, rdx
+    jz      is_disassembled_label_ret_not_found
+    add     rax, ID_SIZE
+    jmp     is_disassembled_label_loop
+is_disassembled_label_ret_not_found:
+    xor     rax, rax
+is_disassembled_label_ret:
+    ret
+
+; add a new label to label_table
+; rdi: label's rip
+; rsi: label's disassembled instruction
+;
+; returns: void
+_add_new_label:
+    mov     rdx, [rel label_table]
+add_new_label_loop:
+    mov     rax, [rdx + label_rip]
+    test    rax, rax
+    jz      add_new_label_add
+    add     rdx, LABEL_ENTRY_SIZE
+    jmp     add_new_label_loop
+add_new_label_add:
+    mov     [rdx + label_rip], rdi
+    mov     [rdx + label_elem], rsi
+    or      BYTE [rsi + id_lm_encode], LABEL_MARK
+    ret
+
+; procedure to handle labels
+; rdi: rip
+; rsi: current list element
+;
+; returns: void
+_handle_label:
+    call    _get_disassembled_instr_memory_offset
+    cmp     BYTE [rsi + rax + mem_base], RIP
+    jne     handle_label_ret
+    mov     bl, [rsi + id_opcode]
+    and     bl, 11b
+    test    bl, bl
+    jnz     handle_label_rel_32
+    add     dil, [rsi + rax + mem_disp]
+    jmp     handle_label_check_if_known
+handle_label_rel_32:
+    add     edi, [rsi + rax + mem_disp]
+handle_label_check_if_known:
+    call    _is_known_label
+    test    al, al
+    jnz     handle_label_ret
+    call    _is_disassembled_label
+    test    rax, rax
+    jz      handle_label_new_label
+    mov     rsi, rax
+    call    _add_new_label
+    jmp     handle_label_ret
+handle_label_new_label:
+    
+handle_label_ret:
+    ret
+    
 
 ; creates the disassembled instruction list
 ; rdi: rip
@@ -687,6 +852,17 @@ disass_loop:
     call    _disass_next_instr
     pop     rdi
     add     rdi, rax
+    push    rax
+    call    _instr_with_label
+    test    al, al
+    jz      disass_loop_no_label
+    push    rdi
+    push    rsi
+    call    _handle_label
+    pop     rsi
+    pop     rdi
+disass_loop_no_label:
+    pop     rax
     add     rsi, ID_SIZE
     pop     rcx
     sub     rcx, rax
@@ -699,7 +875,9 @@ say_hello:
     push    QWORD [rel hello]
     push    QWORD [hello]
     push    QWORD [rsi]
-    call    QWORD [rsi]
+say_hello_test_label:
+    call    say_hello
+    jmp     say_hello_test_label
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
     ret
