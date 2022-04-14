@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/14 17:58:22 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/14 18:17:49 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -319,5 +319,15 @@ void        _display_labels(t_label_entry *label_table)
         printf("Label: %p disassembled at : %p\nCorresponding to:\n\t", label_table->rip, label_table->instr);
         display_instr(label_table->instr);
         label_table++;
+    }
+}
+
+void        _display_future_labels(long *future_label_table)
+{
+    printf("Future labels table: \n");
+    while (*future_label_table)
+    {
+        printf("\t%p\n", *future_label_table);
+        future_label_table++;
     }
 }

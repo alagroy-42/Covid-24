@@ -18,6 +18,7 @@ section .text
     global _start
     extern _display_list
     extern _display_labels
+    extern _display_future_labels
 
 _start:
     xor     rdi, rdi
@@ -64,6 +65,8 @@ _start:
     call    _display_list
     mov     rdi, [label_table]
     call    _display_labels
+    mov     rdi, [future_label_table]
+    call    _display_future_labels
 %endif
     jmp     _end
 
@@ -805,6 +808,22 @@ add_new_label_add:
     or      BYTE [rsi + id_lm_encode], LABEL_MARK
     ret
 
+; add a new label to future_label_table
+; rdi: the label's rip
+;
+; returns: void
+_add_new_future_label:
+    mov     rdx, [rel future_label_table]
+add_new_future_label_loop:
+    mov     rax, [rdx]
+    test    rax, rax
+    jz      add_new_future_label_add
+    add     rdx, 8
+    jmp     add_new_future_label_loop
+add_new_future_label_add:
+    mov     [rdx], rdi
+    ret
+
 ; procedure to handle labels
 ; rdi: rip
 ; rsi: current list element
@@ -833,7 +852,7 @@ handle_label_check_if_known:
     call    _add_new_label
     jmp     handle_label_ret
 handle_label_new_label:
-    
+    call    _add_new_future_label
 handle_label_ret:
     ret
     
@@ -877,7 +896,7 @@ say_hello:
     push    QWORD [rsi]
 say_hello_test_label:
     call    say_hello
-    jmp     say_hello_test_label
+    jmp     _end
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
     ret
