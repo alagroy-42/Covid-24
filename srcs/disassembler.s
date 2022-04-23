@@ -61,6 +61,14 @@ struc       Instruction_disass_M
     idm_rip:       resq    1
 endstruc
 
+struc       Instruction_disass_D
+    idd_opcode:    resb    1
+    idd_lm_encode: resb    1
+    idd_mem:       resb    6
+    idd_pad:       resq    1
+    idd_rip:       resq    1
+endstruc
+
 struc       Instruction_disass_I
     idi_opcode:    resb    1
     idi_lm_encode: resb    1
@@ -117,6 +125,7 @@ endstruc
 %define MOV             0xb0
 %define NOP             0x90
 %define SYSCALL         0xf0
+%define DOUBLE          0x0f
 %define RET             0xc0
 %define LEA             0x80
 %define PUSH            0x50
@@ -160,7 +169,7 @@ endstruc
 
 %define MODRM_ENTSIZE   8
 
-%define BASE            (1 << 5)       
+%define BASE            (1 << 5)
 %define SINDEX          (1 << 4)
 %define NO_SINDEX       RIP
 

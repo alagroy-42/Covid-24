@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/14 18:17:49 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/15 16:51:42 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -130,6 +130,8 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "CALL");
     else if (op_value == 0xec)
         strcpy(opcode, "JMP");
+    else if (op_value == 0x70)
+        strcpy(opcode, "JCC");
     else
         strcpy(opcode, "NOP");
 }
@@ -286,16 +288,16 @@ static void     display_instr(t_instr *instr)
     else if (encoding == 6) // O
     {
         get_register(((t_instr_o *)instr)->reg, size, reg);
-        printf("\toperands: %s\n", reg);
+        printf("\toperand: %s\n", reg);
     }
     else if (encoding == 7) // I
     {
-        printf("\toperands: %0#x\n", ((t_instr_i *)instr)->imm);
+        printf("\toperand: %0#x\n", ((t_instr_i *)instr)->imm);
     }
-    else if (encoding == 8) // M
+    else if (encoding == 8 || encoding == 9) // M || D
     {
         get_mem(((t_instr_m *)instr)->memop, size, mem);
-        printf("\toperands: %s\n", mem);
+        printf("\toperand: %s\n", mem);
     }
 }
 

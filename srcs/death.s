@@ -58,7 +58,6 @@ _start:
     mov     [rel future_label_table], rax
 
     lea     rdi, [rel say_hello]
-    mov     esi, [rel code_len]
     call    _disass
 %ifdef      DEBUG_TIME
     mov     rdi, [instr_list]
@@ -569,9 +568,9 @@ _disass_M:
 ;
 ; returns: operands size
 _disass_D:
-    mov     BYTE [rsi + id_lm_encode], M
-    mov     BYTE [rsi + idm_mem + mem_base], RIP
-    mov     BYTE [rsi + idm_mem + mem_sindex], NOREG
+    mov     BYTE [rsi + id_lm_encode], D
+    mov     BYTE [rsi + idd_mem + mem_base], RIP
+    mov     BYTE [rsi + idd_mem + mem_sindex], NOREG
     xor     rbx, rbx
     test    dl, dl
     jnz     disass_D_store_offset_32
@@ -582,7 +581,7 @@ disass_D_store_offset_32:
     mov     al, 4
     mov     ebx, DWORD [rdi]
 disass_D_store_offset:
-    mov     DWORD [rsi + idm_mem + mem_disp], ebx
+    mov     DWORD [rsi + idd_mem + mem_disp], ebx
     ret
 
 ; extends the opcode with the extension stored in ModRM's reg if needed
@@ -855,18 +854,53 @@ handle_label_new_label:
     call    _add_new_future_label
 handle_label_ret:
     ret
-    
+
+; checks if the current node is a terminating one
+; rsi: node
+;
+; returns: 0 if no, 1 if yes
+_is_terminating_node:
+    xor     al, al
+    mov     cl, [rsi + id_opcode]
+    and     cl, 11111100b
+    mov     bl, [rsi + id_lm_encode]
+    and     bl, 1111b
+    cmp     cl, RET
+    je      is_terminating_node_yes
+    cmp     cl, JMP
+    jne     is_terminating_node_no
+    cmp     bl, D
+    je      is_terminating_node_no
+is_terminating_node_yes:
+    inc     al
+is_terminating_node_no:
+    ret
+
+; pops a future label from future label table
+;
+; returns: the address of the last future label, NULL if future label table is empty
+_pop_future_label:
+    mov     rbx, [rel future_label_table]
+pop_future_label_loop:
+    mov     rax, [rbx]
+    mov     rdx, [rbx + 8]
+    test    rdx, rdx
+    jz      pop_future_label_table_end
+    add     rbx, 8
+    jmp     pop_future_label_loop
+pop_future_label_table_end:
+    mov     QWORD [rbx], 0
+    ret
 
 ; creates the disassembled instruction list
 ; rdi: rip
-; rsi: len
 ;
 ; returns : void
 _disass:
-    mov     rcx, rsi
+    push    rbp
+    mov     rbp, rsp
     mov     rsi, [rel instr_list]
 disass_loop:
-    push    rcx
     push    rdi
     call    _disass_next_instr
     pop     rdi
@@ -881,14 +915,31 @@ disass_loop:
     pop     rsi
     pop     rdi
 disass_loop_no_label:
+    call    _is_terminating_node
+    test    al, al
+    jz      disass_loop_next_instr
+disass_loop_future_label:
+    call    _pop_future_label
+    test    al, al
+    jz      disass_loop_end
+    mov     rdi, rax
+    call    _is_disassembled_label
+    test    al, al
+    jz      disass_loop_new_label
+    mov     rax, rsi
+    call    _add_new_label
+    jmp     disass_loop_future_label
+disass_loop_new_label:
+    add     rsi, ID_SIZE
+    mov     BYTE [rsi + id_lm_encode], LABEL_MARK
+    jmp     disass_loop
+disass_loop_next_instr:
     pop     rax
     add     rsi, ID_SIZE
-    pop     rcx
-    sub     rcx, rax
-    cmp     rcx, 0
-    jg      disass_loop
+    jmp     disass_loop
+disass_loop_end:
+    leave
     ret
-
 
 say_hello:
     push    QWORD [rel hello]
@@ -896,9 +947,16 @@ say_hello:
     push    QWORD [rsi]
 say_hello_test_label:
     call    say_hello
-    jmp     _end
+    call    other_func
+    jmp     say_hello_test_label
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
+    ret
+
+other_func:
+    push    rbp
+    mov     rbp, rsp
+    mov     rax, rbx
     ret
 
 _end:
