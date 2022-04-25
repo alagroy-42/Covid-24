@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/25 11:08:21 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/25 16:38:26 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -191,15 +191,17 @@ static void     get_register(byte reg, int size, char *buf)
             strcpy(buf, " 15");
             break;
         case 16:
-            strcpy(buf, " ip");
+            strcpy(buf, "rip");
             break;
         case 31:
-            strcpy(buf, "NOR");
+            strcpy(buf, "NOREG");
             break;
         default:
             strcpy(buf, "000");
             break;
     }
+    if (reg == 16 || reg == 31)
+        return ;
     switch (size)
     {
         case 8:

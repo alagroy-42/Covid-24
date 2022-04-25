@@ -13,6 +13,8 @@ section .data
     future_label_table: dq 0
     opcode_extension: db 0
     label_instr: db CALL, JMP, JCC, 0
+    ;           rax,  rcx,  rdx,  rbx,  rsp,  rbp,  rsi,  rdi,  r8,   r9,   r10,  r11,  r12,  r13,  r14,  r15
+    regs: db    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
 
 section .text
     global _start
@@ -434,10 +436,17 @@ _disass_MI:
     pop     rdi
 disass_MI_store_imm:
     test    cl, cl
-    jnz     disass_MI_read_imm_32
+    jnz     disass_MI_read_imm_16
     movzx   rax, BYTE [rdi + rbx]
     mov     QWORD [rsi + idmi_imm], rax
     mov     al, 1
+    jmp     disass_MI_end
+disass_MI_read_imm_16:
+    cmp     cl, SIZE_16
+    jnz     disass_MI_read_imm_32
+    mov     ax, WORD [rdi + rbx]
+    mov     QWORD [rsi + idmi_imm], rax
+    mov     al, 2
     jmp     disass_MI_end
 disass_MI_read_imm_32:
     cmp     cl, SIZE_32
@@ -473,10 +482,17 @@ _disass_OI:
     or      al, bl
     mov     BYTE [rsi + idri_reg], al
     test    cl, cl
-    jnz     disass_OI_read_imm_32
+    jnz     disass_OI_read_imm_16
     movzx   rax, BYTE [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
     mov     al, 1
+    jmp     disass_OI_end
+disass_OI_read_imm_16:
+    cmp     cl, SIZE_16
+    jnz     disass_OI_read_imm_32
+    mov     ax, WORD [rdi + 1]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     al, 2
     jmp     disass_OI_end
 disass_OI_read_imm_32:
     cmp     cl, SIZE_32
@@ -624,14 +640,24 @@ _disass_next_instr:
     mov     rbp, rsp
     mov     [rsi + id_rip], rdi
     push    QWORD 0
-    movzx   rax, BYTE [rdi]
+    push    QWORD 0
+    xor     rax, rax
+    mov     al, BYTE [rdi]
     mov     bl, al
+disass_next_instr_test_size_override:
+    cmp     bl, 0x66
+    jne     disass_next_instr_REX
+    mov     QWORD [rsp + 0x8], 1
+    inc     rdi
+    mov     al, BYTE [rdi]
+    mov     bl, al
+disass_next_instr_REX:
     and     bl, 11110000b
     cmp     bl, REX
     jne     continue_disass_next_instr
     mov     [rsp], rax
     inc     rdi
-    movzx   rax, BYTE [rdi]
+    mov     al, BYTE [rdi]
 continue_disass_next_instr:
     xor     r9, r9
     push    rdi
@@ -691,6 +717,11 @@ test_MI:
     jne     test_OI
     mov     cl, BYTE [rsi + id_opcode]
     and     cl, 11b
+    mov     rax, [rsp + 0x8]
+    test    al, al
+    jz      test_MI_disass
+    mov     cl, SIZE_16
+test_MI_disass:
     call    _disass_MI
     jmp     end_disass_next_instr
 test_OI:
@@ -699,6 +730,10 @@ test_OI:
     dec     rdi
     mov     cl, BYTE [rsi + id_opcode]
     and     cl, 11b
+    test    al, al
+    jz      test_OI_disass
+    mov     cl, SIZE_16
+test_OI_disass:
     call    _disass_OI
     jmp     end_disass_next_instr
 test_O:
@@ -731,6 +766,15 @@ end_disass_next_instr:
     jz      instr_not_extended
     call    _disass_instr_extend_opcode
 instr_not_extended:
+    mov     rbx, [rsp + 0x8]
+    test    bl, bl
+    jz      disass_next_instr_return_handle_REX
+    mov     dl, BYTE [rsi + id_opcode]
+    and     dl, 11111100b
+    or      dl, SIZE_16
+    mov     BYTE [rsi + id_opcode], dl
+    inc     rax
+disass_next_instr_return_handle_REX:
     mov     rbx, [rsp]
     shr     rbx, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
     inc     rax ; opcode
@@ -966,6 +1010,9 @@ say_hello:
     push    QWORD [rel hello]
     push    QWORD [hello]
     push    QWORD [rsi]
+    mov     WORD [rel hello], 0
+    mov     ax, bx
+    mov     ax, 16
 say_hello_test_label:
     call    say_hello
     mov     rbx, rax
