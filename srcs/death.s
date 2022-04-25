@@ -633,9 +633,12 @@ _disass_next_instr:
     inc     rdi
     movzx   rax, BYTE [rdi]
 continue_disass_next_instr:
+    xor     r9, r9
     push    rdi
     mov     rdi, rax
     call    _get_instr
+    cmp     al, DOUBLE
+    je      disass_next_instr_double_opcode
     mov     BYTE [rsi + id_opcode], al
     call    _is_instr_reg_extended
     mov     r8, rax
@@ -650,9 +653,26 @@ disass_next_instr_store_size:
     call    _get_instr_encoding
     or      BYTE [rsi + id_lm_encode], al
     pop     rdi
+    jmp     disass_next_instr_test
+disass_next_instr_double_opcode:
+    pop     rdi
+    inc     rdi
+    inc     r9
+    mov     al, BYTE [rdi]
+    cmp     al, 0x05
+    jne     disass_next_instr_jcc
+    mov     BYTE [rsi + id_opcode], SYSCALL | SIZE_32
+    or      BYTE [rsi + id_lm_encode], NO
+    mov     al, NO
+    jmp     disass_next_instr_test
+disass_next_instr_jcc:
+    mov     BYTE [rsi + id_opcode], JCC | SIZE_32
+    or      BYTE [rsi + id_lm_encode], D
+    mov     al, D
+disass_next_instr_test:
     test    al, al
     jnz     test_MR
-    inc     al
+    mov     al, 0
     jmp     end_disass_next_instr
 test_MR:
     mov     rdx, [rsp]
@@ -714,6 +734,7 @@ instr_not_extended:
     mov     rbx, [rsp]
     shr     rbx, 6 ; bit 0x40 is 1 if there is a REX, 0 otherwise
     inc     rax ; opcode
+    add     rax, r9 ; double opcode
     add     rax, rbx ; REX
     movzx   rax, al
     leave
@@ -947,8 +968,9 @@ say_hello:
     push    QWORD [rsi]
 say_hello_test_label:
     call    say_hello
-    call    other_func
-    jmp     say_hello_test_label
+    mov     rbx, rax
+    syscall
+    jne     other_func
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
     ret
