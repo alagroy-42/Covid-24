@@ -189,7 +189,8 @@ _read_SIB_byte_store_sindex:
 ;
 ; returns: void
 _read_SIB_byte_store_disp_8:
-    movzx   eax, BYTE [rdi + 1]
+    xor     eax, eax
+    mov     al, BYTE [rdi + 1]
     mov     [rsi + mem_disp], eax
     ret
 
@@ -299,7 +300,6 @@ _read_ModRM_byte:
     pop     rsi
     mov     BYTE [rsi + mem_base], al
     mov     BYTE [rsi + mem_sindex], NOREG
-    movzx   rax, al
     mov     rbx, rax
     and     rbx, 111b
     call    _read_ModRM_mod
@@ -333,7 +333,8 @@ read_ModRM_byte_handle_RM:
     jz      read_ModRM_byte_return_bytes_nb
     cmp     al, DISP8
     jne     read_ModRM_byte_handle_RM_handle_disp_32
-    movzx   edx, BYTE [rdi + 1]
+    xor     edx, edx
+    mov     dl, BYTE [rdi + 1]
     inc     bl
     jmp     read_ModRM_byte_handle_RM_store_disp
 read_ModRM_byte_handle_RM_handle_disp_32:
@@ -437,7 +438,7 @@ _disass_MI:
 disass_MI_store_imm:
     test    cl, cl
     jnz     disass_MI_read_imm_16
-    movzx   rax, BYTE [rdi + rbx]
+    mov     al, BYTE [rdi + rbx]
     mov     QWORD [rsi + idmi_imm], rax
     mov     al, 1
     jmp     disass_MI_end
@@ -483,29 +484,29 @@ _disass_OI:
     mov     BYTE [rsi + idri_reg], al
     test    cl, cl
     jnz     disass_OI_read_imm_16
-    movzx   rax, BYTE [rdi + 1]
+    mov     al, BYTE [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
-    mov     al, 1
+    mov     rax, 1
     jmp     disass_OI_end
 disass_OI_read_imm_16:
     cmp     cl, SIZE_16
     jnz     disass_OI_read_imm_32
     mov     ax, WORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
-    mov     al, 2
+    mov     rax, 2
     jmp     disass_OI_end
 disass_OI_read_imm_32:
     cmp     cl, SIZE_32
     jnz     disass_OI_read_imm_64
     mov     eax, DWORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
-    mov     al, 4
+    mov     rax, 4
     jmp     disass_OI_end
 disass_OI_read_imm_64:
     and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
     mov     rax, QWORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
-    mov     al, 8
+    mov     rax, 8
     jmp     disass_OI_end
 disass_OI_end:
     ret
@@ -598,6 +599,47 @@ disass_D_store_offset_32:
     mov     ebx, DWORD [rdi]
 disass_D_store_offset:
     mov     DWORD [rsi + idd_mem + mem_disp], ebx
+    ret
+
+; disassemble an AI-encoded instruction
+; rdi: rip
+; rsi: current element
+; rdx: operand size
+;
+; returns: instruction length
+_disass_AI:
+    mov     al, BYTE [rsi + id_lm_encode] 
+    and     al, 11110000b
+    or      al, RI
+    mov     BYTE [rsi + id_lm_encode], al
+    mov     BYTE [rsi + idri_reg], 0
+    test    dl, dl
+    jnz     disass_AI_read_imm_16
+    mov     al, BYTE [rdi]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     rax, 1
+    jmp     disass_AI_end
+disass_AI_read_imm_16:
+    cmp     dl, SIZE_16
+    jnz     disass_AI_read_imm_32
+    mov     ax, WORD [rdi]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     rax, 2
+    jmp     disass_AI_end
+disass_AI_read_imm_32:
+    cmp     dl, SIZE_32
+    jnz     disass_AI_read_imm_64
+    mov     eax, DWORD [rdi]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     rax, 4
+    jmp     disass_AI_end
+disass_AI_read_imm_64:
+    and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
+    mov     rax, QWORD [rdi]
+    mov     QWORD [rsi + idri_imm], rax
+    mov     rax, 8
+    jmp     disass_AI_end
+disass_AI_end:
     ret
 
 ; extends the opcode with the extension stored in ModRM's reg if needed
@@ -756,10 +798,22 @@ test_M:
     jmp     end_disass_next_instr
 test_D:
     cmp     al, D
-    jne     end_disass_next_instr
+    jne     test_AI
     mov     dl, BYTE [rsi + id_opcode]
     and     dl, 11b
     call    _disass_D
+    jmp     end_disass_next_instr
+test_AI:
+    cmp     al, AI
+    jne     end_disass_next_instr
+    mov     dl, BYTE [rsi + id_opcode]
+    and     dl, 11b
+    mov     rax, [rsp + 0x8]
+    test    al, al
+    jz      test_AI_disass
+    mov     dl, SIZE_16
+test_AI_disass:
+    call    _disass_AI
     jmp     end_disass_next_instr
 end_disass_next_instr:
     test    r8, r8
@@ -780,7 +834,6 @@ disass_next_instr_return_handle_REX:
     inc     rax ; opcode
     add     rax, r9 ; double opcode
     add     rax, rbx ; REX
-    movzx   rax, al
     leave
     ret
 
@@ -997,6 +1050,7 @@ disass_loop_future_label:
 disass_loop_new_label:
     add     rsi, ID_SIZE
     mov     BYTE [rsi + id_lm_encode], LABEL_MARK
+    call    _add_new_label
     jmp     disass_loop
 disass_loop_next_instr:
     pop     rax
@@ -1013,6 +1067,9 @@ say_hello:
     mov     WORD [rel hello], 0
     mov     ax, bx
     mov     ax, 16
+    and     al, 0
+    and     ax, 0x1234
+    and     eax, 0x12345678
 say_hello_test_label:
     call    say_hello
     mov     rbx, rax

@@ -132,6 +132,7 @@ endstruc
 %define POP             0x58
 %define CALL            0xe8
 %define JMP             0xec
+%define AND             0x20
 %define JCC             0x70
 
 %define LABEL_MARK      0x10
@@ -146,6 +147,7 @@ endstruc
 %define I               0x7
 %define M               0x8
 %define D               0x9
+%define AI              0xa
 
 %define RM              0x1
 %define SIB             0x2

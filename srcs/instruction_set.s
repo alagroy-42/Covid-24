@@ -43,8 +43,8 @@ instruction_set0x20: db NOP, 0, SIZE_32, 0
 instruction_set0x21: db NOP, 0, SIZE_32, 0
 instruction_set0x22: db NOP, 0, SIZE_32, 0
 instruction_set0x23: db NOP, 0, SIZE_32, 0
-instruction_set0x24: db NOP, 0, SIZE_32, 0
-instruction_set0x25: db NOP, 0, SIZE_32, 0
+instruction_set0x24: db AND, AI, SIZE_8, 0
+instruction_set0x25: db AND, AI, SIZE_32, 0
 instruction_set0x26: db NOP, 0, SIZE_32, 0
 instruction_set0x27: db NOP, 0, SIZE_32, 0
 instruction_set0x28: db NOP, 0, SIZE_32, 0

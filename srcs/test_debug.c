@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/25 16:38:26 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/04/26 17:11:21 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -132,6 +132,8 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "JMP");
     else if (op_value == 0x70)
         strcpy(opcode, "JCC");
+    else if (op_value == 0x20)
+        strcpy(opcode, "AND");
     else if (op_value == 0xf0)
         strcpy(opcode, "SYSCALL");
     else
