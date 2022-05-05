@@ -694,7 +694,7 @@ _disass_instr_extend_opcode:
     and     bl, 0xfc
     mov     cl, BYTE [rel opcode_extension]
     cmp     bl, PUSH
-    jne     disass_instr_extend_opcode_next_opcode
+    jne     disass_instr_extend_opcode_test_add
     cmp     cl, 6
     je      disass_instr_extend_opcode_end
     cmp     cl, 2
@@ -711,6 +711,38 @@ disass_instr_extend_opcode_test_push_4:
     or      BYTE [rsi + id_opcode], bl
     jmp     disass_instr_extend_opcode_end
     
+disass_instr_extend_opcode_test_add:
+    cmp     bl, ADD
+    jne     disass_instr_extend_opcode_next_opcode
+    mov     dl, [rsi + id_opcode]
+    and     dl, 11b
+    cmp     cl, 1
+    jne     disass_instr_extend_opcode_add_test_4
+    or      dl, OR
+    jmp     disass_instr_extend_opcode_add_change_opcode
+disass_instr_extend_opcode_add_test_4:
+    cmp     cl, 4
+    jne     disass_instr_extend_opcode_add_test_5
+    or      dl, AND
+    jmp     disass_instr_extend_opcode_add_change_opcode
+disass_instr_extend_opcode_add_test_5:
+    cmp     cl, 5
+    jne     disass_instr_extend_opcode_add_test_6
+    or      dl, SUB
+    jmp     disass_instr_extend_opcode_add_change_opcode
+disass_instr_extend_opcode_add_test_6:
+    cmp     cl, 7
+    jne     disass_instr_extend_opcode_add_test_7
+    or      dl, XOR
+    jmp     disass_instr_extend_opcode_add_change_opcode
+
+disass_instr_extend_opcode_add_test_7:
+    cmp     cl, 7
+    jne     disass_instr_extend_opcode_end
+    or      dl, CMP
+disass_instr_extend_opcode_add_change_opcode:
+    mov     BYTE [rsi + id_opcode], dl
+    jmp     disass_instr_extend_opcode_end
 disass_instr_extend_opcode_next_opcode:
 disass_instr_extend_opcode_end:
     ret
@@ -1129,12 +1161,12 @@ say_hello:
     ; and     ax, 0x1234
     ; and     eax, 0x12345678
     add     al, 0
-    add     ax, 0x1234
-    add     eax, 0x12345678
-    add     bl, 0x12
-    add     cx, 0x1234
+    or      ax, 0x1234
+    sub     eax, 0x12345678
+    or      bl, 0x12
+    xor     cx, 0x1234
     add     edx, 0x12345678
-    add     rdx, 0x12345678
+    cmp     rdx, 0x12345678
 say_hello_test_label:
     call    say_hello
     mov     rbx, rax
