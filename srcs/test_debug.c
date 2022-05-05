@@ -6,12 +6,29 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/04/26 17:11:21 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/05/05 16:25:04 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdio.h>
 #include <string.h>
+
+#define PUSH            0x50
+#define POP             0x58
+#define JCC             0x70
+#define ADD             0x80
+#define OR              0x84
+#define AND             0x88
+#define SUB             0x8c
+#define NOP             0x90
+#define XOR             0x94
+#define CMP             0x98
+#define LEA             0x9c
+#define MOV             0xb0
+#define RET             0xc0
+#define CALL            0xe8
+#define JMP             0xec
+#define SYSCALL         0xf0
 
 typedef unsigned char   byte;
 
@@ -116,25 +133,35 @@ typedef struct              s_label_entry
 static void     get_opcode(char *opcode, byte op_value)
 {
     op_value &= 0b11111100;
-    if (op_value == 0xc0)
+    if (op_value == RET)
         strcpy(opcode, "RET");
-    else if (op_value == 0x80)
+    else if (op_value == LEA)
         strcpy(opcode, "LEA");
-    else if (op_value == 0xb0)
+    else if (op_value == MOV)
         strcpy(opcode, "MOV");
-    else if (op_value == 0x50)
+    else if (op_value == PUSH)
         strcpy(opcode, "PUSH");
-    else if (op_value == 0x58)
+    else if (op_value == POP)
         strcpy(opcode, "POP");
-    else if (op_value == 0xe8)
+    else if (op_value == CALL)
         strcpy(opcode, "CALL");
-    else if (op_value == 0xec)
+    else if (op_value == JMP)
         strcpy(opcode, "JMP");
-    else if (op_value == 0x70)
+    else if (op_value == JCC)
         strcpy(opcode, "JCC");
-    else if (op_value == 0x20)
+    else if (op_value == AND)
         strcpy(opcode, "AND");
-    else if (op_value == 0xf0)
+    else if (op_value == ADD)
+        strcpy(opcode, "ADD");
+    else if (op_value == SUB)
+        strcpy(opcode, "SUB");
+    else if (op_value == OR)
+        strcpy(opcode, "OR");
+    else if (op_value == XOR)
+        strcpy(opcode, "XOR");
+    else if (op_value == CMP)
+        strcpy(opcode, "CMP");
+    else if (op_value == SYSCALL)
         strcpy(opcode, "SYSCALL");
     else
         strcpy(opcode, "NOP");

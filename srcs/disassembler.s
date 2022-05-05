@@ -122,18 +122,23 @@ endstruc
 %define REXX            (1 << 1)
 %define REXB            (1 << 0)
 
-%define MOV             0xb0
-%define NOP             0x90
-%define SYSCALL         0xf0
 %define DOUBLE          0x0f
-%define RET             0xc0
-%define LEA             0x80
 %define PUSH            0x50
 %define POP             0x58
+%define JCC             0x70
+%define ADD             0x80
+%define OR              0x84
+%define AND             0x88
+%define SUB             0x8c
+%define NOP             0x90
+%define XOR             0x94
+%define CMP             0x98
+%define LEA             0x9c
+%define MOV             0xb0
+%define RET             0xc0
 %define CALL            0xe8
 %define JMP             0xec
-%define AND             0x20
-%define JCC             0x70
+%define SYSCALL         0xf0
 
 %define LABEL_MARK      0x10
 
@@ -148,6 +153,7 @@ endstruc
 %define M               0x8
 %define D               0x9
 %define AI              0xa
+%define MI8             0xb
 
 %define RM              0x1
 %define SIB             0x2

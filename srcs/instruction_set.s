@@ -7,12 +7,12 @@ section .data:
     global ModRM_tab
 
 
-instruction_set0x00: db NOP, 0, SIZE_32, 0
-instruction_set0x01: db NOP, 0, SIZE_32, 0
-instruction_set0x02: db NOP, 0, SIZE_32, 0
-instruction_set0x03: db NOP, 0, SIZE_32, 0
-instruction_set0x04: db NOP, 0, SIZE_32, 0
-instruction_set0x05: db NOP, 0, SIZE_32, 0
+instruction_set0x00: db ADD, MR, SIZE_8, 0
+instruction_set0x01: db ADD, MR, SIZE_32, 0
+instruction_set0x02: db ADD, RM, SIZE_8, 0
+instruction_set0x03: db ADD, RM, SIZE_32, 0
+instruction_set0x04: db ADD, AI, SIZE_8, 0
+instruction_set0x05: db ADD, AI, SIZE_32, 0
 instruction_set0x06: db NOP, 0, SIZE_32, 0
 instruction_set0x07: db NOP, 0, SIZE_32, 0
 instruction_set0x08: db NOP, 0, SIZE_32, 0
@@ -135,10 +135,10 @@ instruction_set0x7c: db JCC, D, SIZE_8, 0
 instruction_set0x7d: db JCC, D, SIZE_8, 0
 instruction_set0x7e: db JCC, D, SIZE_8, 0
 instruction_set0x7f: db JCC, D, SIZE_8, 0
-instruction_set0x80: db NOP, 0, SIZE_32, 0
-instruction_set0x81: db NOP, 0, SIZE_32, 0
+instruction_set0x80: db ADD, MI, SIZE_8, 1
+instruction_set0x81: db ADD, MI, SIZE_32, 1
 instruction_set0x82: db NOP, 0, SIZE_32, 0
-instruction_set0x83: db NOP, 0, SIZE_32, 0
+instruction_set0x83: db ADD, MI8, SIZE_32, 1
 instruction_set0x84: db NOP, 0, SIZE_32, 0
 instruction_set0x85: db NOP, 0, SIZE_32, 0
 instruction_set0x86: db NOP, 0, SIZE_32, 0

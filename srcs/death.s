@@ -418,6 +418,7 @@ disass_RM_return_bytes_nb:
 ; rsi: curr list elem
 ; rdx: rex
 ; cl: size
+; r8: regiater extension bool
 ;
 ; returns : operands size
 _disass_MI:
@@ -427,14 +428,29 @@ _disass_MI:
     push    rcx
     push    rsi
     mov     rcx, rdx
-    mov     rdx, rsi
     add     rsi, idmi_mem
+    push    rdx
     lea     rdx, [rel opcode_extension]
     call    _read_ModRM_byte
+    pop     rdx
     mov     rbx, rax
     pop     rsi
     pop     rcx
     pop     rdi
+    test    al, al
+    jnz     disass_MI_store_imm
+    mov     al, BYTE [rdi]
+    and     al, 111b
+    mov     bl, dl
+    and     bl, REXB
+    shl     bl, 3
+    or      al, bl
+    mov     BYTE [rsi + idri_reg], al
+    mov     al, BYTE [rsi + id_lm_encode]
+    and     al, 11110000b
+    or      al, RI
+    mov     BYTE [rsi + id_lm_encode], al
+    mov     bl, 1
 disass_MI_store_imm:
     test    cl, cl
     jnz     disass_MI_read_imm_16
@@ -450,17 +466,9 @@ disass_MI_read_imm_16:
     mov     al, 2
     jmp     disass_MI_end
 disass_MI_read_imm_32:
-    cmp     cl, SIZE_32
-    jnz     disass_MI_read_imm_64
     mov     eax, DWORD [rdi + rbx]
     mov     QWORD [rsi + idmi_imm], rax
     mov     al, 4
-    jmp     disass_MI_end
-disass_MI_read_imm_64:
-    and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
-    mov     rax, QWORD [rdi + rbx]
-    mov     QWORD [rsi + idmi_imm], rax
-    mov     al, 8
     jmp     disass_MI_end
 disass_MI_end:
     add     rax, rbx ; operands
@@ -490,19 +498,22 @@ _disass_OI:
     jmp     disass_OI_end
 disass_OI_read_imm_16:
     cmp     cl, SIZE_16
-    jnz     disass_OI_read_imm_32
+    jnz     disass_OI_read_imm_32_test
     mov     ax, WORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
     mov     rax, 2
     jmp     disass_OI_end
-disass_OI_read_imm_32:
+disass_OI_read_imm_32_test:
     cmp     cl, SIZE_32
     jnz     disass_OI_read_imm_64
+disass_OI_read_imm_32:
     mov     eax, DWORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
     mov     rax, 4
     jmp     disass_OI_end
 disass_OI_read_imm_64:
+    cmp     BYTE [rsi + id_opcode], MOV | SIZE_64
+    jne     disass_OI_read_imm_32
     and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
     mov     rax, QWORD [rdi + 1]
     mov     QWORD [rsi + idri_imm], rax
@@ -547,14 +558,9 @@ _disass_I:
     mov     al, 1
     jmp     _disass_I_store_imm
 _disass_I_imm_32:
-    cmp     dl, SIZE_32
-    jne     _disass_I_imm_64
     mov     ebx, DWORD [rdi]
     mov     al, 4
     jmp     _disass_I_store_imm
-_disass_I_imm_64:
-    mov     rbx, QWORD [rdi]
-    mov     al, 8
 _disass_I_store_imm:
     mov     [rsi + idi_imm], rbx
     leave
@@ -627,19 +633,56 @@ disass_AI_read_imm_16:
     mov     rax, 2
     jmp     disass_AI_end
 disass_AI_read_imm_32:
-    cmp     dl, SIZE_32
-    jnz     disass_AI_read_imm_64
     mov     eax, DWORD [rdi]
     mov     QWORD [rsi + idri_imm], rax
     mov     rax, 4
-    jmp     disass_AI_end
-disass_AI_read_imm_64:
-    and     BYTE [rsi + id_opcode], 11111100b | SIZE_64
-    mov     rax, QWORD [rdi]
-    mov     QWORD [rsi + idri_imm], rax
-    mov     rax, 8
-    jmp     disass_AI_end
 disass_AI_end:
+    ret
+
+; disass an MI8 encoded instruction
+; rdi: rip
+; rsi: current list elem
+; rdx: REX
+; cl: size
+; r8: regiater extension bool
+;
+; returns: the size of the operands
+_disass_MI8:
+    push    rbp
+    mov     rbp, rsp
+    push    rdi
+    push    rcx
+    push    rsi
+    mov     rcx, rdx
+    add     rsi, idmi_mem
+    push    rdx
+    lea     rdx, [rel opcode_extension]
+    call    _read_ModRM_byte
+    pop     rdx
+    mov     rbx, rax
+    pop     rsi
+    pop     rcx
+    pop     rdi
+    test    al, al
+    jnz     disass_MI8_store_imm
+    mov     al, BYTE [rdi]
+    and     al, 111b
+    mov     bl, dl
+    and     bl, REXB
+    shl     bl, 3
+    or      al, bl
+    mov     BYTE [rsi + idri_reg], al
+    mov     al, BYTE [rsi + id_lm_encode]
+    and     al, 11110000b
+    or      al, RI
+    mov     BYTE [rsi + id_lm_encode], al
+    mov     bl, 1
+disass_MI8_store_imm:
+    mov     al, BYTE [rdi + rbx]
+    mov     QWORD [rsi + idmi_imm], rax
+    inc     rbx ; imm8
+    mov     rax, rbx
+    leave
     ret
 
 ; extends the opcode with the extension stored in ModRM's reg if needed
@@ -805,7 +848,7 @@ test_D:
     jmp     end_disass_next_instr
 test_AI:
     cmp     al, AI
-    jne     end_disass_next_instr
+    jne     test_MI8
     mov     dl, BYTE [rsi + id_opcode]
     and     dl, 11b
     mov     rax, [rsp + 0x8]
@@ -814,6 +857,18 @@ test_AI:
     mov     dl, SIZE_16
 test_AI_disass:
     call    _disass_AI
+    jmp     end_disass_next_instr
+test_MI8:
+    cmp     al, MI
+    jne     end_disass_next_instr
+    mov     cl, BYTE [rsi + id_opcode]
+    and     cl, 11b
+    mov     rax, [rsp + 0x8]
+    test    al, al
+    jz      test_MI8_disass
+    mov     cl, SIZE_16
+test_MI8_disass:
+    call    _disass_MI8
     jmp     end_disass_next_instr
 end_disass_next_instr:
     test    r8, r8
@@ -834,6 +889,9 @@ disass_next_instr_return_handle_REX:
     inc     rax ; opcode
     add     rax, r9 ; double opcode
     add     rax, rbx ; REX
+    mov     bl, al
+    xor     rax, rax
+    mov     al, bl
     leave
     ret
 
@@ -1061,15 +1119,22 @@ disass_loop_end:
     ret
 
 say_hello:
-    push    QWORD [rel hello]
-    push    QWORD [hello]
-    push    QWORD [rsi]
-    mov     WORD [rel hello], 0
-    mov     ax, bx
-    mov     ax, 16
-    and     al, 0
-    and     ax, 0x1234
-    and     eax, 0x12345678
+    ; push    QWORD [rel hello]
+    ; push    QWORD [hello]
+    ; push    QWORD [rsi]
+    ; mov     WORD [rel hello], 0
+    ; mov     ax, bx
+    ; mov     ax, 16
+    ; and     al, 0
+    ; and     ax, 0x1234
+    ; and     eax, 0x12345678
+    add     al, 0
+    add     ax, 0x1234
+    add     eax, 0x12345678
+    add     bl, 0x12
+    add     cx, 0x1234
+    add     edx, 0x12345678
+    add     rdx, 0x12345678
 say_hello_test_label:
     call    say_hello
     mov     rbx, rax
