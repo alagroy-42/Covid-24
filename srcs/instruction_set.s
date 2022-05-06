@@ -139,8 +139,8 @@ instruction_set0x80: db ADD, MI, SIZE_8, 1
 instruction_set0x81: db ADD, MI, SIZE_32, 1
 instruction_set0x82: db NOP, 0, SIZE_32, 0
 instruction_set0x83: db ADD, MI8, SIZE_32, 1
-instruction_set0x84: db NOP, 0, SIZE_32, 0
-instruction_set0x85: db NOP, 0, SIZE_32, 0
+instruction_set0x84: db TEST, MR, SIZE_8, 0
+instruction_set0x85: db TEST, MR, SIZE_32, 0
 instruction_set0x86: db NOP, 0, SIZE_32, 0
 instruction_set0x87: db NOP, 0, SIZE_32, 0
 instruction_set0x88: db MOV, MR, SIZE_8, 0
@@ -175,8 +175,8 @@ instruction_set0xa4: db NOP, 0, SIZE_32, 0
 instruction_set0xa5: db NOP, 0, SIZE_32, 0
 instruction_set0xa6: db NOP, 0, SIZE_32, 0
 instruction_set0xa7: db NOP, 0, SIZE_32, 0
-instruction_set0xa8: db NOP, 0, SIZE_32, 0
-instruction_set0xa9: db NOP, 0, SIZE_32, 0
+instruction_set0xa8: db TEST, AI, SIZE_8, 0
+instruction_set0xa9: db TEST, AI, SIZE_32, 0
 instruction_set0xaa: db NOP, 0, SIZE_32, 0
 instruction_set0xab: db NOP, 0, SIZE_32, 0
 instruction_set0xac: db NOP, 0, SIZE_32, 0
@@ -199,8 +199,8 @@ instruction_set0xbc: db MOV, RI, SIZE_32, 0
 instruction_set0xbd: db MOV, RI, SIZE_32, 0
 instruction_set0xbe: db MOV, RI, SIZE_32, 0
 instruction_set0xbf: db MOV, RI, SIZE_32, 0
-instruction_set0xc0: db NOP, 0, SIZE_32, 0
-instruction_set0xc1: db NOP, 0, SIZE_32, 0
+instruction_set0xc0: db SHL, MI8, SIZE_8, 1
+instruction_set0xc1: db SHL, MI8, SIZE_32, 1
 instruction_set0xc2: db NOP, 0, SIZE_32, 0
 instruction_set0xc3: db RET, NO, SIZE_32, 0
 instruction_set0xc4: db NOP, 0, SIZE_32, 0
@@ -215,8 +215,8 @@ instruction_set0xcc: db NOP, 0, SIZE_32, 0
 instruction_set0xcd: db NOP, 0, SIZE_32, 0
 instruction_set0xce: db NOP, 0, SIZE_32, 0
 instruction_set0xcf: db NOP, 0, SIZE_32, 0
-instruction_set0xd0: db NOP, 0, SIZE_32, 0
-instruction_set0xd1: db NOP, 0, SIZE_32, 0
+instruction_set0xd0: db SHL, M1, SIZE_8, 1
+instruction_set0xd1: db SHL, M1, SIZE_32, 1
 instruction_set0xd2: db NOP, 0, SIZE_32, 0
 instruction_set0xd3: db NOP, 0, SIZE_32, 0
 instruction_set0xd4: db NOP, 0, SIZE_32, 0
@@ -253,8 +253,8 @@ instruction_set0xf2: db NOP, 0, SIZE_32, 0
 instruction_set0xf3: db NOP, 0, SIZE_32, 0
 instruction_set0xf4: db NOP, 0, SIZE_32, 0
 instruction_set0xf5: db NOP, 0, SIZE_32, 0
-instruction_set0xf6: db NOP, 0, SIZE_32, 0
-instruction_set0xf7: db NOP, 0, SIZE_32, 0
+instruction_set0xf6: db TEST, MI, SIZE_8, 0
+instruction_set0xf7: db TEST, MI, SIZE_32, 0
 instruction_set0xf8: db NOP, 0, SIZE_32, 0
 instruction_set0xf9: db NOP, 0, SIZE_32, 0
 instruction_set0xfa: db NOP, 0, SIZE_32, 0

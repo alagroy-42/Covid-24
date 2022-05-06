@@ -134,9 +134,12 @@ endstruc
 %define XOR             0x94
 %define CMP             0x98
 %define LEA             0x9c
+%define TEST            0xa8
 %define MOV             0xb0
 %define RET             0xc4
 %define LEAVE           0xc8
+%define SHL             0xd0
+%define SHR             0xd8
 %define CALL            0xe8
 %define JMP             0xec
 %define SYSCALL         0xf0

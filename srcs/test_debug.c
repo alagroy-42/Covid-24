@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/05/06 14:31:16 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/05/06 16:57:20 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,9 +24,12 @@
 #define XOR             0x94
 #define CMP             0x98
 #define LEA             0x9c
+#define TEST            0xa8
 #define MOV             0xb0
 #define RET             0xc4
 #define LEAVE           0xc8
+#define SHL             0xd0
+#define SHR             0xd8
 #define CALL            0xe8
 #define JMP             0xec
 #define SYSCALL         0xf0
@@ -172,6 +175,12 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "DEC");
     else if (op_value == LEAVE)
         strcpy(opcode, "LEAVE");
+    else if (op_value == SHL)
+        strcpy(opcode, "SHL");
+    else if (op_value == SHR)
+        strcpy(opcode, "SHR");
+    else if (op_value == TEST)
+        strcpy(opcode, "TEST");
     else
         strcpy(opcode, "NOP");
 }
