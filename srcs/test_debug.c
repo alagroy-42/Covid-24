@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/05/05 16:25:04 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/05/06 14:31:16 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,10 +25,13 @@
 #define CMP             0x98
 #define LEA             0x9c
 #define MOV             0xb0
-#define RET             0xc0
+#define RET             0xc4
+#define LEAVE           0xc8
 #define CALL            0xe8
 #define JMP             0xec
 #define SYSCALL         0xf0
+#define INC             0xf4
+#define DEC             0xf8
 
 typedef unsigned char   byte;
 
@@ -163,6 +166,12 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "CMP");
     else if (op_value == SYSCALL)
         strcpy(opcode, "SYSCALL");
+    else if (op_value == INC)
+        strcpy(opcode, "INC");
+    else if (op_value == DEC)
+        strcpy(opcode, "DEC");
+    else if (op_value == LEAVE)
+        strcpy(opcode, "LEAVE");
     else
         strcpy(opcode, "NOP");
 }

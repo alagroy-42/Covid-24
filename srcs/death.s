@@ -575,12 +575,29 @@ _disass_I_store_imm:
 _disass_M:
     push    rbp
     mov     rbp, rsp
+    push    rdx
     mov     rcx, rdx
     mov     rdx, rsi
     add     rsi, idm_mem
     lea     rdx, [rel opcode_extension]
     call    _read_ModRM_byte
     sub     rsi, idm_mem
+    pop     rdx
+    test    al, al
+    jnz     disass_M_leave
+    mov     al, BYTE [rdi]
+    and     al, 111b
+    mov     bl, dl
+    and     bl, REXB
+    shl     bl, 3
+    or      al, bl
+    mov     BYTE [rsi + ido_reg], al
+    mov     al, BYTE [rsi + id_lm_encode]
+    and     al, 11110000b
+    or      al, O
+    mov     BYTE [rsi + id_lm_encode], al
+    mov     al, 1
+disass_M_leave:
     leave
     ret
 
@@ -695,8 +712,22 @@ _disass_instr_extend_opcode:
     mov     cl, BYTE [rel opcode_extension]
     cmp     bl, PUSH
     jne     disass_instr_extend_opcode_test_add
-    cmp     cl, 6
-    je      disass_instr_extend_opcode_end
+    test    cl, cl
+    jne     disass_instr_extend_opcode_test_push_1
+    mov     bl, BYTE [rsi + id_opcode]
+    and     bl, 11b
+    or      bl, INC
+    mov     BYTE [rsi + id_opcode], bl
+    jmp     disass_instr_extend_opcode_end
+disass_instr_extend_opcode_test_push_1:
+    cmp     cl, 1
+    jne     disass_instr_extend_opcode_test_push_2
+    mov     bl, BYTE [rsi + id_opcode]
+    and     bl, 11b
+    or      bl, DEC
+    mov     BYTE [rsi + id_opcode], bl
+    jmp     disass_instr_extend_opcode_end
+disass_instr_extend_opcode_test_push_2:
     cmp     cl, 2
     jne     disass_instr_extend_opcode_test_push_4
     mov     BYTE [rsi + id_opcode], CALL
@@ -705,15 +736,19 @@ _disass_instr_extend_opcode:
     jmp     disass_instr_extend_opcode_end
 disass_instr_extend_opcode_test_push_4:
     cmp     cl, 4
-    jne     disass_instr_extend_opcode_end
+    jne     disass_instr_extend_opcode_test_push_6
     mov     BYTE [rsi + id_opcode], JMP
     mov     bl, SIZE_64
     or      BYTE [rsi + id_opcode], bl
     jmp     disass_instr_extend_opcode_end
-    
+disass_instr_extend_opcode_test_push_6:
+    cmp     cl, 6
+    jne     disass_instr_extend_opcode_end
+    inc     BYTE [rsi + id_opcode] ; SIZE_32 => SIZE_64
+    jmp     disass_instr_extend_opcode_end
 disass_instr_extend_opcode_test_add:
     cmp     bl, ADD
-    jne     disass_instr_extend_opcode_next_opcode
+    jne     disass_instr_extend_opcode_test_inc
     mov     dl, [rsi + id_opcode]
     and     dl, 11b
     cmp     cl, 1
@@ -742,6 +777,13 @@ disass_instr_extend_opcode_add_test_7:
     or      dl, CMP
 disass_instr_extend_opcode_add_change_opcode:
     mov     BYTE [rsi + id_opcode], dl
+    jmp     disass_instr_extend_opcode_end
+disass_instr_extend_opcode_test_inc:
+    cmp     bl, INC | SIZE_8
+    jne     disass_instr_extend_opcode_next_opcode
+    cmp     cl, 1
+    jne     disass_instr_extend_opcode_end
+    mov     BYTE [rsi + id_opcode], DEC | SIZE_8
     jmp     disass_instr_extend_opcode_end
 disass_instr_extend_opcode_next_opcode:
 disass_instr_extend_opcode_end:
@@ -1151,22 +1193,7 @@ disass_loop_end:
     ret
 
 say_hello:
-    ; push    QWORD [rel hello]
-    ; push    QWORD [hello]
-    ; push    QWORD [rsi]
-    ; mov     WORD [rel hello], 0
-    ; mov     ax, bx
-    ; mov     ax, 16
-    ; and     al, 0
-    ; and     ax, 0x1234
-    ; and     eax, 0x12345678
-    add     al, 0
-    or      ax, 0x1234
-    sub     eax, 0x12345678
-    or      bl, 0x12
-    xor     cx, 0x1234
-    add     edx, 0x12345678
-    cmp     rdx, 0x12345678
+    push    QWORD [rel hello]
 say_hello_test_label:
     call    say_hello
     mov     rbx, rax
@@ -1174,6 +1201,7 @@ say_hello_test_label:
     jne     other_func
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
+    leave
     ret
 
 other_func:

@@ -208,7 +208,7 @@ instruction_set0xc5: db NOP, 0, SIZE_32, 0
 instruction_set0xc6: db MOV, MI, SIZE_8, 0
 instruction_set0xc7: db MOV, MI, SIZE_32, 0
 instruction_set0xc8: db NOP, 0, SIZE_32, 0
-instruction_set0xc9: db NOP, 0, SIZE_32, 0
+instruction_set0xc9: db LEAVE, NO, SIZE_32, 0
 instruction_set0xca: db NOP, 0, SIZE_32, 0
 instruction_set0xcb: db NOP, 0, SIZE_32, 0
 instruction_set0xcc: db NOP, 0, SIZE_32, 0
@@ -261,8 +261,8 @@ instruction_set0xfa: db NOP, 0, SIZE_32, 0
 instruction_set0xfb: db NOP, 0, SIZE_32, 0
 instruction_set0xfc: db NOP, 0, SIZE_32, 0
 instruction_set0xfd: db NOP, 0, SIZE_32, 0
-instruction_set0xfe: db NOP, 0, SIZE_32, 0
-instruction_set0xff: db PUSH, M, SIZE_64, 1
+instruction_set0xfe: db INC, M, SIZE_8, 1
+instruction_set0xff: db PUSH, M, SIZE_32, 1
 
 ;;; Mod/RM Tab
 

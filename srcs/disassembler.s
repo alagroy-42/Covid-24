@@ -135,10 +135,13 @@ endstruc
 %define CMP             0x98
 %define LEA             0x9c
 %define MOV             0xb0
-%define RET             0xc0
+%define RET             0xc4
+%define LEAVE           0xc8
 %define CALL            0xe8
 %define JMP             0xec
 %define SYSCALL         0xf0
+%define INC             0xf4
+%define DEC             0xf8
 
 %define LABEL_MARK      0x10
 
@@ -154,6 +157,7 @@ endstruc
 %define D               0x9
 %define AI              0xa
 %define MI8             0xb
+%define M1              0xc
 
 %define RM              0x1
 %define SIB             0x2
