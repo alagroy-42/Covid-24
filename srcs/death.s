@@ -58,8 +58,8 @@ _start:
     jnz     _end
     mov     [rel future_label_table], rax
 
-    lea     rdi, [rel say_hello]
-    ; lea     rdi, [rel _disass_next_instr]
+    ; lea     rdi, [rel say_hello]
+    lea     rdi, [rel _disass_next_instr]
     call    _disass
 %ifdef      DEBUG_TIME
     mov     rdi, [instr_list]
@@ -664,6 +664,10 @@ disass_AI_end:
 _disass_MI8:
     push    rbp
     mov     rbp, rsp
+    mov     al, BYTE [rsi + id_lm_encode]
+    and     al, 11110000b
+    or      al, MI
+    mov     BYTE [rsi + id_lm_encode], al
     push    rdi
     push    rcx
     push    rsi
@@ -694,10 +698,6 @@ _disass_MI8:
 disass_MI8_store_imm:
     mov     al, BYTE [rdi + rbx]
     mov     QWORD [rsi + idmi_imm], rax
-    mov     al, BYTE [rsi + id_lm_encode]
-    and     al, 11110000b
-    or      al, MI
-    mov     BYTE [rsi + id_lm_encode], al
     inc     rbx ; imm8
     mov     rax, rbx
     leave
@@ -713,6 +713,10 @@ disass_MI8_store_imm:
 _disass_M1:
     push    rbp
     mov     rbp, rsp
+    mov     al, BYTE [rsi + id_lm_encode]
+    and     al, 11110000b
+    or      al, MI
+    mov     BYTE [rsi + id_lm_encode], al
     push    rdi
     push    rcx
     push    rsi
@@ -743,10 +747,6 @@ _disass_M1:
 disass_M1_store_1:
     mov     al, 1
     mov     QWORD [rsi + idmi_imm], rax
-    mov     al, BYTE [rsi + id_lm_encode]
-    and     al, 11110000b
-    or      al, MI
-    mov     BYTE [rsi + id_lm_encode], al
     mov     rax, rbx
     leave
     ret
@@ -1310,49 +1310,10 @@ disass_loop_end:
     ret
 
 say_hello:
-    push    rbp
-    mov     rbp, rsp
-    movsx   cx, al
-    movsx   edx, bl
-    movsx   r10, r9b
-    mov     al, 5
-    add     rax, 5
-    test    al, al
-    jne     say_hello_test_al0
-    call    other_func
-    cmp     al, 5
-    je      say_hello_test_al5
-    jmp     say_hello_test_ret
-say_hello_test_al5:
-    shl     QWORD [rax], 3
-    add     al, 5
-    jmp     say_hello_test_ret
-say_hello_test_al0:
-    call    say_hello
-    mov     rbx, rax
-    syscall
-    jne     other_func
-    push    QWORD [rdi + rbx * 8 + 0x1234]
-    push    QWORD [rsp + 0x1234]
-say_hello_test_ret:
-    leave
-    ret
-
-other_func:
-    push    rbp
-    mov     rbp, rsp
-    test    rdi, rdi
-    jne     other_func_first_label
-    mov     rdi, rsi
-    add     rax, 5
-    and     rbx, 111b
-    cmp     rbx, 5
-    je      other_func_first_label
-    mov     rcx, rax
-    jmp     other_func_ret
-other_func_first_label:
-    mov     rax, rbx
-other_func_ret:
+    add     rax, 0x5
+    add     al, 0x5
+    add     ax, 0x5
+    add     eax, 0x5
     ret
 
 _end:

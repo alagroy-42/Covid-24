@@ -6,7 +6,7 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/05/10 15:09:55 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/05/10 18:09:35 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -291,7 +291,7 @@ static void     get_mem(t_memop memop, int size, char *buf)
     sprintf(buf, "[%s + %s * %u + %#0x]", reg_base, reg_index, scale, memop.disp);
 }
 
-static void     display_instr(t_instr *instr)
+static void     display_instr(t_instr *instr, int label_display)
 {
     char        opcode[10];
     char        reg[10];
@@ -311,7 +311,9 @@ static void     display_instr(t_instr *instr)
     else
         size = 64;
     get_opcode(opcode, instr->opcode);
-    dprintf(fd, "%p:\t\t%s\t(size: %d), LM: %d:", instr->rip, opcode, size, instr->lm_encode >> 4);
+    if ((instr->lm_encode >> 4) && label_display)
+        dprintf(fd, "\nLABEL:\n");
+    dprintf(fd, "%p:\t\t%s\t", instr->rip, opcode);
     if (encoding == 0)
         dprintf(fd, "\n");
     else if (encoding == 1) // RM
@@ -351,11 +353,13 @@ static void     display_instr(t_instr *instr)
     {
         dprintf(fd, "\t%0#x\n", ((t_instr_i *)instr)->imm);
     }
-    else if (encoding == 8 || encoding == 9) // M || D
+    else if (encoding == 8) // M
     {
         get_mem(((t_instr_m *)instr)->memop, size, mem);
         dprintf(fd, "\t%s\n", mem);
     }
+    else if (encoding == 9) // D
+        dprintf(fd, "\t%0#x\n", instr->rip + ((t_instr_m *)instr)->memop.disp);
 }
 
 void        _display_list(t_instr *list)
@@ -363,13 +367,13 @@ void        _display_list(t_instr *list)
     t_instr     *instr;
     static int  i = 0;
 
-    // if ((fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1)
-    //     return ;
+    if ((fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1)
+        return ;
     i++;
     instr = list;
     while (instr->opcode)
     {
-        display_instr(instr);
+        display_instr(instr, 1);
         instr++;
     }
     dprintf(fd, "nb_disassembled_instr = %d\n", i);
@@ -381,7 +385,7 @@ void        _display_labels(t_label_entry *label_table)
     while (label_table->rip)
     {
         dprintf(fd, "Label: %p disassembled at : %p\nCorresponding to:\t", label_table->rip, label_table->instr);
-        display_instr(label_table->instr);
+        display_instr(label_table->instr, 0);
         label_table++;
     }
 }
@@ -395,5 +399,5 @@ void        _display_future_labels(long *future_label_table)
         future_label_table++;
     }
     dprintf(fd, "\n\n");
-    // close(fd);
+    close(fd);
 }
