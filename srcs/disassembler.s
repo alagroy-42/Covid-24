@@ -136,6 +136,7 @@ endstruc
 %define LEA             0x9c
 %define TEST            0xa8
 %define MOV             0xb0
+%define MOVSX           0xbc
 %define RET             0xc4
 %define LEAVE           0xc8
 %define SHL             0xd0

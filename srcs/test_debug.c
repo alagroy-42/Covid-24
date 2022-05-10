@@ -6,12 +6,14 @@
 /*   By: alagroy- <alagroy-@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/04/06 15:18:14 by alagroy-          #+#    #+#             */
-/*   Updated: 2022/05/06 16:57:20 by alagroy-         ###   ########.fr       */
+/*   Updated: 2022/05/10 15:09:55 by alagroy-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define PUSH            0x50
 #define POP             0x58
@@ -26,6 +28,7 @@
 #define LEA             0x9c
 #define TEST            0xa8
 #define MOV             0xb0
+#define MOVSX           0xbc
 #define RET             0xc4
 #define LEAVE           0xc8
 #define SHL             0xd0
@@ -37,6 +40,7 @@
 #define DEC             0xf8
 
 typedef unsigned char   byte;
+int                     fd = 1;
 
 typedef struct              s_instruction_disass
 {
@@ -181,6 +185,8 @@ static void     get_opcode(char *opcode, byte op_value)
         strcpy(opcode, "SHR");
     else if (op_value == TEST)
         strcpy(opcode, "TEST");
+    else if (op_value == MOVSX)
+        strcpy(opcode, "MOVSX");
     else
         strcpy(opcode, "NOP");
 }
@@ -305,71 +311,76 @@ static void     display_instr(t_instr *instr)
     else
         size = 64;
     get_opcode(opcode, instr->opcode);
-    printf("Instruction at %p: opcode: %s, operand_size: %d, LM: %d\n", instr->rip, opcode, size, instr->lm_encode >> 4);
+    dprintf(fd, "%p:\t\t%s\t(size: %d), LM: %d:", instr->rip, opcode, size, instr->lm_encode >> 4);
     if (encoding == 0)
-        return ;
+        dprintf(fd, "\n");
     else if (encoding == 1) // RM
     {
         get_register(((t_instr_rm *)instr)->reg, size, reg);
         get_mem(((t_instr_rm *)instr)->memop, size, mem);
-        printf("\toperands: %s, %s\n", reg, mem);
+        dprintf(fd, "\t%s, %s\n", reg, mem);
     }
     else if (encoding == 2) // MR
     {
         get_register(((t_instr_mr *)instr)->reg, size, reg);
         get_mem(((t_instr_mr *)instr)->memop, size, mem);
-        printf("\toperands: %s, %s\n", mem, reg);
+        dprintf(fd, "\t%s, %s\n", mem, reg);
     }
     else if (encoding == 3) // MI
     {
         get_mem(((t_instr_mi *)instr)->memop, size, mem);
-        printf("\toperands: %s, %#0lx\n", mem, ((t_instr_mi *)instr)->imm);
+        dprintf(fd, "\t%s, %#0lx\n", mem, ((t_instr_mi *)instr)->imm);
     }
     else if (encoding == 4) // OI
     {
         get_register(((t_instr_ri *)instr)->reg, size, reg);
-        printf("\toperands: %s, %#0lx\n", reg, ((t_instr_ri *)instr)->imm);
+        dprintf(fd, "\t%s, %#0lx\n", reg, ((t_instr_ri *)instr)->imm);
     }
     else if (encoding == 5) // RR
     {
         get_register(((t_instr_rr *)instr)->reg, size, reg);
         get_register(((t_instr_rr *)instr)->reg2, size, reg2);
-        printf("\toperands: %s, %s\n", reg, reg2);
+        dprintf(fd, "\t%s, %s\n", reg, reg2);
     }
     else if (encoding == 6) // O
     {
         get_register(((t_instr_o *)instr)->reg, size, reg);
-        printf("\toperand: %s\n", reg);
+        dprintf(fd, "\t%s\n", reg);
     }
     else if (encoding == 7) // I
     {
-        printf("\toperand: %0#x\n", ((t_instr_i *)instr)->imm);
+        dprintf(fd, "\t%0#x\n", ((t_instr_i *)instr)->imm);
     }
     else if (encoding == 8 || encoding == 9) // M || D
     {
         get_mem(((t_instr_m *)instr)->memop, size, mem);
-        printf("\toperand: %s\n", mem);
+        dprintf(fd, "\t%s\n", mem);
     }
 }
 
 void        _display_list(t_instr *list)
 {
     t_instr     *instr;
+    static int  i = 0;
 
+    // if ((fd = open("output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1)
+    //     return ;
+    i++;
     instr = list;
     while (instr->opcode)
     {
         display_instr(instr);
         instr++;
     }
+    dprintf(fd, "nb_disassembled_instr = %d\n", i);
 }
 
 void        _display_labels(t_label_entry *label_table)
 {
-    printf("\nLabel table:\n");
+    dprintf(fd, "\nLabel table:\n");
     while (label_table->rip)
     {
-        printf("Label: %p disassembled at : %p\nCorresponding to:\n\t", label_table->rip, label_table->instr);
+        dprintf(fd, "Label: %p disassembled at : %p\nCorresponding to:\t", label_table->rip, label_table->instr);
         display_instr(label_table->instr);
         label_table++;
     }
@@ -377,10 +388,12 @@ void        _display_labels(t_label_entry *label_table)
 
 void        _display_future_labels(long *future_label_table)
 {
-    printf("Future labels table: \n");
+    dprintf(fd, "Future labels table: \n");
     while (*future_label_table)
     {
-        printf("\t%p\n", *future_label_table);
+        dprintf(fd, "%p, ", *future_label_table);
         future_label_table++;
     }
+    dprintf(fd, "\n\n");
+    // close(fd);
 }

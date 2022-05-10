@@ -7,7 +7,6 @@ BITS 64
 section .data
     hello: db "Hello World !", 10, 0
         .len: equ $ - hello
-    code_len: dd _end - say_hello
     instr_list: dq 0
     label_table: dq 0
     future_label_table: dq 0
@@ -24,7 +23,7 @@ section .text
 
 _start:
     xor     rdi, rdi
-    mov     rsi, 4096
+    mov     rsi, 4096 * 8
     mov     rdx, PROT_READ | PROT_WRITE
     mov     r10, MAP_ANONYMOUS | MAP_PRIVATE
     mov     r8, -1
@@ -60,6 +59,7 @@ _start:
     mov     [rel future_label_table], rax
 
     lea     rdi, [rel say_hello]
+    ; lea     rdi, [rel _disass_next_instr]
     call    _disass
 %ifdef      DEBUG_TIME
     mov     rdi, [instr_list]
@@ -409,7 +409,7 @@ disass_RM_handle_RR:
     mov     BYTE [rsi + id_lm_encode], al
     mov     al, 1
 disass_RM_return_bytes_nb:
-    mov     rax, rbx ; operands
+    ; mov     rax, rbx ; operands
     leave
     ret
 
@@ -607,7 +607,6 @@ disass_M_leave:
 ;
 ; returns: operands size
 _disass_D:
-    mov     BYTE [rsi + id_lm_encode], D
     mov     BYTE [rsi + idd_mem + mem_base], RIP
     mov     BYTE [rsi + idd_mem + mem_sindex], NOREG
     xor     rbx, rbx
@@ -816,7 +815,7 @@ disass_instr_extend_opcode_add_test_5:
     or      dl, SUB
     jmp     disass_instr_extend_opcode_add_change_opcode
 disass_instr_extend_opcode_add_test_6:
-    cmp     cl, 7
+    cmp     cl, 6
     jne     disass_instr_extend_opcode_add_test_7
     or      dl, XOR
     jmp     disass_instr_extend_opcode_add_change_opcode
@@ -885,7 +884,7 @@ continue_disass_next_instr:
     call    _is_instr_reg_extended
     mov     r8, rax
     call    _get_instr_size
-    mov     rbx, [rsp + 0x8]
+    mov     rbx, [rsp + 0x8] ; => [rsp + 0x8] because of push rdi
     and     rbx, REXW
     cmp     rbx, REXW
     jne     disass_next_instr_store_size
@@ -902,10 +901,23 @@ disass_next_instr_double_opcode:
     inc     r9
     mov     al, BYTE [rdi]
     cmp     al, 0x05
-    jne     disass_next_instr_jcc
+    jne     disass_next_instr_test_movsx
     mov     BYTE [rsi + id_opcode], SYSCALL | SIZE_32
     or      BYTE [rsi + id_lm_encode], NO
     mov     al, NO
+    jmp     disass_next_instr_test
+disass_next_instr_test_movsx:
+    cmp     al, 0xbe
+    jne     disass_next_instr_jcc
+    mov     BYTE [rsi + id_opcode], MOVSX
+    mov     al, SIZE_32
+    mov     rbx, [rsp]
+    and     bl, 00001000b
+    shr     bl, 3
+    add     al, bl
+    or      BYTE [rsi + id_opcode], al
+    or      BYTE [rsi + id_lm_encode], RM
+    mov     al, RM
     jmp     disass_next_instr_test
 disass_next_instr_jcc:
     mov     BYTE [rsi + id_opcode], JCC | SIZE_32
@@ -946,6 +958,7 @@ test_OI:
     dec     rdi
     mov     cl, BYTE [rsi + id_opcode]
     and     cl, 11b
+    mov     rax, [rsp + 0x8]
     test    al, al
     jz      test_OI_disass
     mov     cl, SIZE_16
@@ -1118,12 +1131,15 @@ add_new_label_loop:
     mov     rax, [rdx + label_rip]
     test    rax, rax
     jz      add_new_label_add
+    cmp     rax, rdi
+    je      add_new_label_ret
     add     rdx, LABEL_ENTRY_SIZE
     jmp     add_new_label_loop
 add_new_label_add:
     mov     [rdx + label_rip], rdi
     mov     [rdx + label_elem], rsi
     or      BYTE [rsi + id_lm_encode], LABEL_MARK
+add_new_label_ret:
     ret
 
 ; add a new label to future_label_table
@@ -1136,10 +1152,13 @@ add_new_future_label_loop:
     mov     rax, [rdx]
     test    rax, rax
     jz      add_new_future_label_add
+    cmp     rax, rdi
+    je      add_new_future_label_ret
     add     rdx, 8
     jmp     add_new_future_label_loop
 add_new_future_label_add:
     mov     [rdx], rdi
+add_new_future_label_ret:
     ret
 
 ; procedure to handle labels
@@ -1155,10 +1174,11 @@ _handle_label:
     and     bl, 11b
     test    bl, bl
     jnz     handle_label_rel_32
-    add     dil, [rsi + rax + mem_disp]
+    movsx   rbx, BYTE [rsi + rax + mem_disp]
+    add     rdi, rbx 
     jmp     handle_label_check_if_known
 handle_label_rel_32:
-    add     edi, [rsi + rax + mem_disp]
+    add     edi, DWORD [rsi + rax + mem_disp]
 handle_label_check_if_known:
     call    _is_known_label
     test    al, al
@@ -1220,6 +1240,32 @@ _disass:
     mov     rbp, rsp
     mov     rsi, [rel instr_list]
 disass_loop:
+    push    rax
+    push    rcx
+    push    rdx
+    push    rdi
+    push    rsi
+    push    r8
+    push    r9
+    push    r10
+    push    r11
+%ifdef      DEBUG_TIME
+    mov     rdi, [instr_list]
+    call    _display_list
+    mov     rdi, [label_table]
+    call    _display_labels
+    mov     rdi, [future_label_table]
+    call    _display_future_labels
+%endif
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rsi
+    pop     rdi
+    pop     rdx
+    pop     rcx
+    pop     rax
     push    rdi
     call    _disass_next_instr
     pop     rdi
@@ -1237,6 +1283,7 @@ disass_loop_no_label:
     call    _is_terminating_node
     test    al, al
     jz      disass_loop_next_instr
+    push    rsi
 disass_loop_future_label:
     call    _pop_future_label
     test    al, al
@@ -1245,10 +1292,11 @@ disass_loop_future_label:
     call    _is_disassembled_label
     test    al, al
     jz      disass_loop_new_label
-    mov     rax, rsi
+    mov     rsi, rax
     call    _add_new_label
     jmp     disass_loop_future_label
 disass_loop_new_label:
+    pop     rsi
     add     rsi, ID_SIZE
     mov     BYTE [rsi + id_lm_encode], LABEL_MARK
     call    _add_new_label
@@ -1262,33 +1310,49 @@ disass_loop_end:
     ret
 
 say_hello:
-    push    QWORD [rel hello]
+    push    rbp
+    mov     rbp, rsp
+    movsx   cx, al
+    movsx   edx, bl
+    movsx   r10, r9b
+    mov     al, 5
     add     rax, 5
-    add     eax, 5
-    add     ax, 5
-    shl     al, 3
-    shr     ax, 3
-    shr     eax, 3
-    shl     rax, 3
-    shl     BYTE [rax], 3
-    shr     WORD [rax], 3
-    shr     DWORD [rax], 3
+    test    al, al
+    jne     say_hello_test_al0
+    call    other_func
+    cmp     al, 5
+    je      say_hello_test_al5
+    jmp     say_hello_test_ret
+say_hello_test_al5:
     shl     QWORD [rax], 3
     add     al, 5
-say_hello_test_label:
+    jmp     say_hello_test_ret
+say_hello_test_al0:
     call    say_hello
     mov     rbx, rax
     syscall
     jne     other_func
     push    QWORD [rdi + rbx * 8 + 0x1234]
     push    QWORD [rsp + 0x1234]
+say_hello_test_ret:
     leave
     ret
 
 other_func:
     push    rbp
     mov     rbp, rsp
+    test    rdi, rdi
+    jne     other_func_first_label
+    mov     rdi, rsi
+    add     rax, 5
+    and     rbx, 111b
+    cmp     rbx, 5
+    je      other_func_first_label
+    mov     rcx, rax
+    jmp     other_func_ret
+other_func_first_label:
     mov     rax, rbx
+other_func_ret:
     ret
 
 _end:

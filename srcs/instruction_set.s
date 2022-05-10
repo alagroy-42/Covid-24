@@ -145,7 +145,7 @@ instruction_set0x86: db NOP, 0, SIZE_32, 0
 instruction_set0x87: db NOP, 0, SIZE_32, 0
 instruction_set0x88: db MOV, MR, SIZE_8, 0
 instruction_set0x89: db MOV, MR, SIZE_32, 0
-instruction_set0x8a: db NOP, 0, SIZE_32, 0
+instruction_set0x8a: db MOV, RM, SIZE_8, 0
 instruction_set0x8b: db MOV, RM, SIZE_32, 0
 instruction_set0x8c: db NOP, 0, SIZE_32, 0
 instruction_set0x8d: db LEA, RM, SIZE_32, 0
