@@ -44,6 +44,7 @@ Death
 *.pdb
 .gdb_history
 peda-session-*.txt
+output.txt
 
 # Kernel Module Compile Results
 *.mod*
@@ -56,3 +57,4 @@ dkms.conf
 
 # Project files
 todo.todo
+.vscode

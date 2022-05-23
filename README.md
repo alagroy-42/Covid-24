@@ -24,6 +24,12 @@ The disassembler is the first part of the mutation engine, it is by disassemblin
 
 If you want to learn more in depth how the disassembler works, the way it works is very similar to The Mental Driller's one. You can go check its own article on the subject. Only the structures are different, mine are being described in `./srcs/disassembler.s`.
 
+### PRNG
+
+For the shrinker, the expander and the reassembler, we will need a lot of randomness. Even though we could just read `/dev/random`, some modern systems are considering suspicious softwares using too much of the system randomness so we will code our own pseudo-random number generator.<br/>
+The problem with it is that we can't use the `div/mod` instructions because they are register based and they will break after register swapping. Even though we could try to reassign the registers like we do with syscalls, it would not be optimal and a bit tricky so instead, we will find the closest greater power of two from the maximum number that we want to generate and we will generate a random bit sequence with right amount of byte. If the number is in the right range, we are good to go other wise we start the operation again until the number is in the range that we asked.
+To generate this sequence, we will use a Fibonacci LFSR with taps 2, 3 and 5 and initialized with a seed being the last byte of the address of the seed-generator function. With PIE + ASLR + the fact that its position will move at each generation, we can consider it random enough. Though, it will always be the same as lopng as we don't modify the code placed before during debugging (gdb always run the child code at the same place) which is gonna be very practical to debug.
+
 ## Ressources
 
 - https://vxug.fakedoma.in/archive/VxHeaven/lib/vmd01.html

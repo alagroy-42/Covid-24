@@ -11,8 +11,10 @@ section .data
     label_table: dq 0
     future_label_table: dq 0
     opcode_extension: db 0
+    prng_data: db 0
     label_instr: db CALL, JMP, JCC, 0
     ;           rax,  rcx,  rdx,  rbx,  rsp,  rbp,  rsi,  rdi,  r8,   r9,   r10,  r11,  r12,  r13,  r14,  r15
+    assembly_pages: dq 0
     regs: db    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
 
 section .text
@@ -58,8 +60,21 @@ _start:
     jnz     _end
     mov     [rel future_label_table], rax
 
-    ; lea     rdi, [rel say_hello]
-    lea     rdi, [rel _disass_next_instr]
+    xor     rdi, rdi
+    mov     rsi, 4096
+    mov     rdx, PROT_READ | PROT_WRITE
+    mov     r10, MAP_ANONYMOUS | MAP_PRIVATE
+    mov     r8, -1
+    xor     r9, r9
+    mov     rax, SYS_MMAP
+    syscall
+    test    al, al
+    jnz     _end
+    mov     [rel assembly_pages], rax
+
+    call    _prng_init
+
+    lea     rdi, [rel _disass]
     call    _disass
 %ifdef      DEBUG_TIME
     mov     rdi, [instr_list]
@@ -69,6 +84,10 @@ _start:
     mov     rdi, [future_label_table]
     call    _display_future_labels
 %endif
+    mov     rdi, [rel instr_list]
+    mov     rsi, [rel assembly_pages]
+    call    _test_func
+    call    _assemble_code
     jmp     _end
 
 ; translates assembly opcode to pseudo assembly opcode
@@ -1240,32 +1259,32 @@ _disass:
     mov     rbp, rsp
     mov     rsi, [rel instr_list]
 disass_loop:
-    push    rax
-    push    rcx
-    push    rdx
-    push    rdi
-    push    rsi
-    push    r8
-    push    r9
-    push    r10
-    push    r11
-%ifdef      DEBUG_TIME
-    mov     rdi, [instr_list]
-    call    _display_list
-    mov     rdi, [label_table]
-    call    _display_labels
-    mov     rdi, [future_label_table]
-    call    _display_future_labels
-%endif
-    pop     r11
-    pop     r10
-    pop     r9
-    pop     r8
-    pop     rsi
-    pop     rdi
-    pop     rdx
-    pop     rcx
-    pop     rax
+;     push    rax
+;     push    rcx
+;     push    rdx
+;     push    rdi
+;     push    rsi
+;     push    r8
+;     push    r9
+;     push    r10
+;     push    r11
+; %ifdef      DEBUG_TIME
+;     mov     rdi, [instr_list]
+;     call    _display_list
+;     mov     rdi, [label_table]
+;     call    _display_labels
+;     mov     rdi, [future_label_table]
+;     call    _display_future_labels
+; %endif
+;     pop     r11
+;     pop     r10
+;     pop     r9
+;     pop     r8
+;     pop     rsi
+;     pop     rdi
+;     pop     rdx
+;     pop     rcx
+;     pop     rax
     push    rdi
     call    _disass_next_instr
     pop     rdi
@@ -1309,11 +1328,129 @@ disass_loop_end:
     leave
     ret
 
-say_hello:
-    add     rax, 0x5
-    add     al, 0x5
-    add     ax, 0x5
-    add     eax, 0x5
+; assembles pseudo-code elements into real x86-64 bytecode
+; rdi: list of pseudo-code elements
+; rsi: where to put the code
+;
+; returns: void
+_assemble_code:
+    push    rbp
+    mov     rbp, rsp
+    leave
+    ret
+
+; initialize the internal prng state with a random seed
+; 
+; returns: void
+_prng_init:
+    call    prng_init_next_line
+prng_init_next_line:
+    pop     rdx
+    mov     [rel prng_data], dl
+    ret
+
+; performs the lfsr on the prng_data byte (taps are 2, 3 and 5) 1 is put is the sum is odd
+; rdi: number of output bytes (max 8)
+;
+; returns: the output bits
+_lfsr_iter:
+    xor     rax, rax
+lfsr_iter_loop:
+    shl     al, 1
+    mov     dl, [rel prng_data]
+    mov     cl, dl
+    and     cl, 1
+    or      al, cl  ; output byte
+    shr     dl, 1
+                    ; add taps
+    xor     bl, bl
+    mov     cl, dl
+    shr     cl, 2
+    and     cl, 1
+    add     bl, cl
+    mov     cl, dl
+    shr     cl, 3
+    and     cl, 1
+    add     bl, cl
+    mov     cl, dl
+    shr     cl, 5
+    and     cl, 1
+    add     bl, cl
+                    ; compute taps
+    shl     bl, 7
+    or      dl, bl
+    mov     BYTE [rel prng_data], dl
+    dec     dil
+    test    dil, dil
+    jnz     lfsr_iter_loop
+    ret
+
+; gets a pseudo-random number
+; rdi: the range of number to get (from 0 to rdi - 1)
+; 
+; returns: the number generated
+_get_prn:
+    mov     dl, 8
+get_prn_pow2_for_prn_loop:
+    dec     dl
+    mov     al, 1
+    mov     cl, dl
+get_prn_shl_loop:   ; since the only way to have a variable shl is to use cl and we want to avoid unnecessary 
+                    ; register dependant instruction, we will loop the shl
+    shl     al, 1
+    dec     cl
+    test    cl, cl
+    jnz     get_prn_shl_loop
+    test    al, dil
+    jz      get_prn_pow2_for_prn_loop
+    inc     dl   ; so that we have a greater number of bits than the number
+    mov     rsi, rdi
+    mov     dil, dl
+    call    _lfsr_iter
+    cmp     al, sil
+    jl      get_prn_ret
+    mov     rdi, rsi
+    call    _get_prn
+get_prn_ret:
+    ret
+
+_test_func:
+    mov     dil, 2
+    call    _get_prn
+     mov     dil, 2
+    call    _get_prn
+     mov     dil, 2
+    call    _get_prn
+    mov     dil, 5
+    call    _get_prn
+    mov     dil, 5
+    call    _get_prn
+    mov     dil, 5
+    call    _get_prn
+    mov     dil, 8
+    call    _get_prn
+    mov     dil, 8
+    call    _get_prn
+    mov     dil, 8
+    call    _get_prn
+    mov     dil, 7
+    call    _get_prn
+    mov     dil, 7
+    call    _get_prn
+    mov     dil, 7
+    call    _get_prn
+    mov     dil, 4
+    call    _get_prn
+    mov     dil, 4
+    call    _get_prn
+    mov     dil, 4
+    call    _get_prn
+    mov     dil, 9
+    call    _get_prn
+    mov     dil, 9
+    call    _get_prn
+    mov     dil, 9
+    call    _get_prn
     ret
 
 _end:
