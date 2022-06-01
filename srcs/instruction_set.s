@@ -199,7 +199,7 @@ instruction_set0xbc: db MOV, RI, SIZE_32, 0
 instruction_set0xbd: db MOV, RI, SIZE_32, 0
 instruction_set0xbe: db MOV, RI, SIZE_32, 0
 instruction_set0xbf: db MOV, RI, SIZE_32, 0
-instruction_set0xc0: db SHL, MI8, SIZE_8, 1
+instruction_set0xc0: db SHL, MI, SIZE_8, 1
 instruction_set0xc1: db SHL, MI8, SIZE_32, 1
 instruction_set0xc2: db NOP, 0, SIZE_32, 0
 instruction_set0xc3: db RET, NO, SIZE_32, 0

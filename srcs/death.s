@@ -16,6 +16,11 @@ section .data
     ;           rax,  rcx,  rdx,  rbx,  rsp,  rbp,  rsi,  rdi,  r8,   r9,   r10,  r11,  r12,  r13,  r14,  r15
     assembly_pages: dq 0
     regs: db    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+    OSO_byte: db 0
+    REX_byte: db 0
+    opcode_byte: db 0
+    ModRM_byte: db 0
+    SIB_byte: db 0
 
 section .text
     global _start
@@ -74,19 +79,18 @@ _start:
 
     call    _prng_init
 
-    lea     rdi, [rel _disass]
+    lea     rdi, [rel _test_func]
     call    _disass
 %ifdef      DEBUG_TIME
-    mov     rdi, [instr_list]
+    mov     rdi, [rel instr_list]
     call    _display_list
-    mov     rdi, [label_table]
+    mov     rdi, [rel label_table]
     call    _display_labels
-    mov     rdi, [future_label_table]
+    mov     rdi, [rel future_label_table]
     call    _display_future_labels
 %endif
     mov     rdi, [rel instr_list]
     mov     rsi, [rel assembly_pages]
-    call    _test_func
     call    _assemble_code
     jmp     _end
 
@@ -1328,6 +1332,246 @@ disass_loop_end:
     leave
     ret
 
+; gets the right opcode for reassembly
+; rdi: pseudo-opcode
+; rsi: encoding
+; rdx: size
+;
+; returns: the opcode (raw if a register needs to be added)
+_get_right_opcode:
+    lea     rcx, [rel instruction_set0x00]
+    xor     rax, rax
+    dec     rax
+get_right_opcode_loop:
+    inc     rax
+    cmp     rax, 0x100
+    je      get_right_opcode_ret
+    cmp     BYTE [rcx + rax * ISE_SIZE + ise_opcode], dil
+    jne     get_right_opcode_loop
+    cmp     BYTE [rcx + rax * ISE_SIZE + ise_encoding], sil
+    jne     get_right_opcode_loop
+    cmp     BYTE [rcx + rax * ISE_SIZE + ise_size], dl
+    jne     get_right_opcode_loop
+get_right_opcode_ret:
+    ret
+
+; gets particular encoding if conditions are met
+; rdi: disassembled instruction
+; rsi: supposed encoding
+;
+; returns: the "true" encoding
+_transform_special_encoding:
+    cmp     sil, RI
+    jne     transform_special_encoding_test_MI
+    mov     al, BYTE [rdi + idri_reg]
+    test    al, al ; test if al == rax
+    jnz     transform_special_encoding_test_8
+    mov     al, [rdi + id_opcode]
+    and     al, 11111100b
+    cmp     al, ADD
+    jl      transform_special_encoding_test_8
+    cmp     al, TEST
+    jg      transform_special_encoding_test_8
+    mov     al, AI
+    jmp     transform_special_encoding_ret
+transform_special_encoding_test_MI:
+    cmp     sil, MI
+    jne     transform_special_encoding_ret_default
+transform_special_encoding_test_8:
+    mov     rax, [rdi + idri_imm] ; same as idmi_imm
+    shr     rax, 8
+    test    rax, rax
+    jnz     transform_special_encoding_test_M1
+transform_special_encoding_test_8support:
+    mov     al, [rdi + id_opcode]
+    and     al, 11111100b
+    cmp     al, ADD
+    je     transform_special_encoding_8found
+    cmp     al, SHL
+    je     transform_special_encoding_8found
+transform_special_encoding_test_8support_SHR:
+    cmp     al, SHR
+    jne     transform_special_encoding_test_M1
+transform_special_encoding_8found:
+    mov     al, MI8
+    jmp     transform_special_encoding_ret
+transform_special_encoding_test_M1:
+    cmp     QWORD [rdi + idri_imm], 1
+    jne     transform_special_encoding_ret_default
+    mov     al, [rdi + id_opcode]
+    and     al, 11111100b
+    cmp     al, SHL
+    je      transform_special_encoding_M1found
+    cmp     al, SHR
+    jne     transform_special_encoding_ret_default
+transform_special_encoding_M1found:
+    mov     al, M1
+    jmp     transform_special_encoding_ret
+transform_special_encoding_ret_default:
+    mov     al, sil
+transform_special_encoding_ret:
+    ret
+
+; transforms RR/RI encoding in RM/MI that are the ones present in
+; the instruction set
+; rdi: the disassembled instruction
+; rsi: the supposed encoding
+;
+; rax: the "true" encoding
+_transform_classic_encoding:
+    mov     al, sil
+    cmp     sil, RI
+    jne     transform_classic_encoding_test_RR
+    mov     dl, [rdi + id_opcode]
+    and     dl, 11111100b
+    cmp     dl, MOV
+    je      transform_classic_encoding_ret
+    mov     al, MI
+transform_classic_encoding_test_RR:
+    cmp     sil, RR
+    jne     transform_classic_encoding_ret
+    mov     al, MR
+transform_classic_encoding_ret:
+    ret
+
+; transforms SIZE26/64 in SIZE_32 for instruction_set
+; dil: the opcode
+; sil: the encoding
+; dl: supposed size
+;
+; rax: "true" size
+_transform_size:
+    mov     al, dl
+    cmp     dl, SIZE_8
+    je      transform_size_ret
+    cmp     dl, SIZE_64
+    jne     transform_size_test_16
+    cmp     dil, PUSH
+    je      transform_size_ret
+    cmp     dil, POP
+    je      transform_size_ret
+    mov     al, SIZE_32
+transform_size_test_16:
+    cmp     dl, SIZE_16
+    jne     transform_size_ret
+    mov     al, SIZE_32
+transform_size_ret:
+    ret
+
+; puts the reg extension in the ModRM byte if needed and transforms
+; the opcode so that it can be founf in the instruction set
+; rdi: disassembled instruction
+;
+; returns: the opcode that is gonna appear in the instruction set
+_extend_opcode_in_reg:
+    mov     dl, [rdi + id_opcode]
+    and     dl, 11111100b
+    mov     cl, [rdi + id_lm_encode]
+    and     cl, 1111b
+    cmp     cl, M
+    jne     extend_opcode_test_mi
+    cmp     dl, INC
+    je      extend_opcode_inc
+    cmp     dl, DEC
+    je      extend_opcode_dec
+    cmp     dl, CALL
+    je      extend_opcode_call
+    cmp     dl, JMP
+    je      extend_opcode_jmp
+    cmp     dl, PUSH
+    je      extend_opcode_push
+extend_opcode_test_mi:
+    cmp     cl, MI
+    jne     extend_opcode_default
+    cmp     dl, ADD
+    je      extend_opcode_add
+    cmp     dl, OR
+    je      extend_opcode_or
+    cmp     dl, AND
+    je      extend_opcode_and
+    cmp     dl, SUB
+    je      extend_opcode_sub
+    cmp     dl, XOR
+    je      extend_opcode_xor
+    cmp     dl, CMP
+    je      extend_opcode_cmp
+    cmp     dl, SHL
+    je      extend_opcode_shl
+    cmp     dl, SHR
+    je      extend_opcode_shr
+    jmp     extend_opcode_default
+extend_opcode_inc:
+    mov     al, 0
+    jmp     extend_opcode_extend_M
+extend_opcode_dec:
+    mov     al, 1
+    jmp     extend_opcode_extend_M
+extend_opcode_call:
+    mov     al, 2
+    jmp     extend_opcode_extend_M
+extend_opcode_jmp:
+    mov     al, 4
+    jmp     extend_opcode_extend_M
+extend_opcode_push:
+    mov     al, 6
+    jmp     extend_opcode_extend_M
+extend_opcode_add:
+    mov     al, 0
+    jmp     extend_opcode_extend_MI
+extend_opcode_or:
+    mov     al, 1
+    jmp     extend_opcode_extend_MI
+extend_opcode_and:
+    mov     al, 4
+    jmp     extend_opcode_extend_MI
+extend_opcode_sub:
+    mov     al, 5
+    jmp     extend_opcode_extend_MI
+extend_opcode_xor:
+    mov     al, 6
+    jmp     extend_opcode_extend_MI
+extend_opcode_cmp:
+    mov     al, 7
+    jmp     extend_opcode_extend_MI
+extend_opcode_shl:
+    mov     al, 4
+    jmp     extend_opcode_extend_MI
+extend_opcode_shr:
+    mov     al, 5
+    jmp     extend_opcode_extend_MI
+extend_opcode_extend_M:
+    shl     al, 3
+    or      BYTE [rel ModRM_byte], al
+    jmp     extend_opcode_transform_M_code
+extend_opcode_extend_MI:
+    shl     al, 3
+    or      BYTE [rel ModRM_byte], al
+    cmp     dl, SHL
+    je      extend_opcode_transform_MI_code_shl
+    cmp     dl, SHR
+    je      extend_opcode_transform_MI_code_shl
+    jmp     extend_opcode_transform_MI_code_add
+extend_opcode_transform_M_code:
+    mov     dl, [rdi + id_opcode]
+    and     dl, 11b
+    cmp     dl, SIZE_8
+    je      extend_opcode_transform_M_code_8
+    mov     al, PUSH
+    jmp     extend_opcode_ret
+extend_opcode_transform_M_code_8:
+    mov     al, INC
+    jmp     extend_opcode_ret
+extend_opcode_transform_MI_code_shl:
+    mov     al, SHL
+    jmp     extend_opcode_ret
+extend_opcode_transform_MI_code_add:
+    mov     al, ADD
+    jmp     extend_opcode_ret
+extend_opcode_default:
+    mov     al, dl
+extend_opcode_ret:
+    ret
+
 ; assembles pseudo-code elements into real x86-64 bytecode
 ; rdi: list of pseudo-code elements
 ; rsi: where to put the code
@@ -1336,6 +1580,39 @@ disass_loop_end:
 _assemble_code:
     push    rbp
     mov     rbp, rsp
+assemble_loop:
+    xor     al, al
+    mov     [rel OSO_byte], al
+    mov     [rel REX_byte], al
+    mov     [rel opcode_byte], al
+    mov     [rel ModRM_byte], al
+    mov     [rel SIB_byte], al
+
+    push    rsi
+
+    call    _extend_opcode_in_reg
+    push    rax
+    mov     sil, [rdi + id_lm_encode]
+    and     sil, 1111b
+    call    _transform_special_encoding
+    mov     sil, al
+    call    _transform_classic_encoding
+    mov     sil, al
+    mov     dl, [rdi + id_opcode]
+    pop     rcx
+    push    rdi
+    mov     rdi, rcx
+    and     dl, 11b
+    call    _transform_size
+    mov     dl, al
+    call    _get_right_opcode
+    mov     [rel opcode_byte], al
+
+    pop     rdi
+    add     rdi, ID_SIZE
+    mov     rax, [rdi]
+    test    rax, rax
+    jnz     assemble_loop
     leave
     ret
 
@@ -1415,42 +1692,14 @@ get_prn_ret:
     ret
 
 _test_func:
-    mov     dil, 2
-    call    _get_prn
-     mov     dil, 2
-    call    _get_prn
-     mov     dil, 2
-    call    _get_prn
-    mov     dil, 5
-    call    _get_prn
-    mov     dil, 5
-    call    _get_prn
-    mov     dil, 5
-    call    _get_prn
-    mov     dil, 8
-    call    _get_prn
-    mov     dil, 8
-    call    _get_prn
-    mov     dil, 8
-    call    _get_prn
-    mov     dil, 7
-    call    _get_prn
-    mov     dil, 7
-    call    _get_prn
-    mov     dil, 7
-    call    _get_prn
-    mov     dil, 4
-    call    _get_prn
-    mov     dil, 4
-    call    _get_prn
-    mov     dil, 4
-    call    _get_prn
-    mov     dil, 9
-    call    _get_prn
-    mov     dil, 9
-    call    _get_prn
-    mov     dil, 9
-    call    _get_prn
+    push    rbp
+    mov     rbp, rsp
+    add     rbp, 0x10
+    mov     rsp, 0x20
+    mov     al, 2
+    push    rax
+    pop     QWORD [rel instr_list]
+    leave
     ret
 
 _end:
