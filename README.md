@@ -1,6 +1,10 @@
 # Covid-24
 This project aims in creating a fully metamorphic virus that will change its own code while replicating.
 
+⚠️ WIP
+
+This project is currently in pause, I will get back on it at some point. It is now far from complete!!
+
 ## Disclaimer
 
 This project is purely pedagogical and is not made for any illegal or irresponsible use. I cannot be held responsible for anyone misusing this project.
